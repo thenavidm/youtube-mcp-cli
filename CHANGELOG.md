@@ -1,4 +1,54 @@
-# Versions
+# Changelog
+
+## 2.0.0
+
+The same 16 tools, now as shell commands too, and several channels without a
+config file.
+
+**Renamed to `@thenavidm/youtube-mcp-cli`.** One install gives two binaries on
+one file: `youtube-mcp` is the server an MCP client launches, `youtube-cli` is
+the one you type. The old package name stays on npm at 1.0.0.
+
+**A command line for every tool.** `youtube-cli` lists them, `<command> --help`
+shows the flags, and `schema <command>` prints the exact JSON Schema an MCP
+client receives. Both surfaces read one array of tool definitions, so they
+cannot drift. `--agent` sets JSON, compact output and no prompts in one flag,
+`--select` trims a JSON result to the fields you name, and errors are always JSON
+on stderr. Exit codes let a script branch without reading prose: 2 usage, 3 not
+found, 4 auth, 5 API, 7 rate limited, 10 nothing configured.
+
+**Login once per channel.** `youtube-cli login` runs the OAuth flow and saves the
+channel to `~/.youtube-mcp-cli/channels.json`, encrypted with a key derived from
+this machine and account, written 0600. Run it again for each channel. The CLI
+and the MCP server both read the file, so several channels work with no
+`YOUTUBE_ACCOUNTS` array to paste. `--account` picks one, and with two or more
+connected the account tools still refuse to guess. `logout <channel>` forgets
+one. `login --api-key KEY` saves the API key the same way. `login --print` also
+prints the env entry for a machine where the file cannot live. `auth` still
+works as the old name for `login`.
+
+In 1.0.0, `auth` printed a refresh token and stored nothing, which left the
+multi-channel setup as a JSON array assembled by hand.
+
+**Errors that say what to do next.** A call that needs setup that is not there
+now says "No account is configured" or "No API key is configured", names the
+`youtube-cli login` command that fixes it, and exits 10. It used to report a 401,
+which reads like an expired credential.
+
+**Refusals name the right flag.** A guarded write refused in the terminal asks
+for `--confirm`; the same refusal through MCP asks for `confirm: true`.
+
+**The context cost is measured in Claude Code**: about 5,000 tokens a message
+with every tool loaded, about 490 with Claude Code's default tool search, and
+2,300 for `SKILL.md` once. The README has the method.
+
+**A used-up quota exits 7.** Google sends it as a 403, which the CLI read as a
+rejected credential and exited 4.
+
+**Also:** a Claude Desktop extension, a CI handshake that compares the tool count
+against the source instead of a typed number, a script that fails when any
+document's tool count disagrees with the server, and American spelling
+throughout.
 
 ## 1.0.0
 

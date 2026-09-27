@@ -3,32 +3,53 @@
 ## Reporting a vulnerability
 
 Report it privately through
-[GitHub security advisories](https://github.com/thenavidm/youtube-mcp/security/advisories/new),
+[GitHub security advisories](https://github.com/thenavidm/youtube-mcp-cli/security/advisories/new),
 not as a public issue.
 
-## What this server holds
+## What this holds
 
-Credentials live in your MCP client's config and in this process's environment.
-Nothing is written to disk by the server itself, and there is no backend: every
-request goes from your machine to Google directly.
+There is no backend. Every request goes from your machine to Google directly.
+
+Credentials live in one of two places, and you choose which:
+
+- **Your MCP client's config and this process's environment**, when you set the
+  `YOUTUBE_*` variables.
+- **`~/.youtube-mcp-cli/channels.json`**, when you run `youtube-cli login`. It
+  holds the refresh token and OAuth client for each channel you connect, plus
+  the API key if you saved one with `login --api-key`. The file is written 0600
+  in a 0700 directory and encrypted with AES-256-GCM under a key derived from
+  this OS account and this machine, which is never stored.
+
+Be clear about what that encryption buys. A copied file is useless on another
+machine, and a casual read of a disk or a backup sees ciphertext. It is not a
+vault: code running as you on this machine can derive the same key. That is the
+same exposure as an environment variable, which is why env vars stay fully
+supported. `YOUTUBE_MCP_HOME` moves the file.
 
 A connected refresh token reaches a real channel. It can read private videos,
 edit titles, post public comments and delete videos. Treat it like a password.
+`youtube-cli logout` removes a channel from the file, but the token keeps working
+until you revoke it at
+[Google Account permissions](https://myaccount.google.com/permissions).
 
-`youtube-mcp auth` prints a refresh token to your terminal and stores nothing.
-That is deliberate: the token belongs in your client config, and a cache file
-would be a second copy to leak and a second place to go stale.
+`youtube-cli login` prints no token unless you pass `--print`.
 
 ## The write-safety model
 
 Writes work by default, because managing a channel is the point of the tool.
+There are 13 read tools and 3 that write.
 
-`reply_to_comment` and `delete_video` require `confirm: true`, because neither
-can be taken back. `update_video` does not, because it is reversible.
+`reply_to_comment` and `delete_video` require confirmation, because neither can
+be taken back: `confirm: true` through MCP, `--confirm` in the terminal. The CLI
+goes through the same guard as the server, so the rules are identical on both
+surfaces. `update_video` needs neither, because it is reversible.
 
 `YOUTUBE_READ_ONLY=1` removes every write tool from the list rather than failing
 at call time. Use it when pointing an agent you do not fully trust at a real
 channel.
+
+`YOUTUBE_ALLOW_DESTRUCTIVE=0` keeps the reversible write and blocks the two
+irreversible ones outright.
 
 `YOUTUBE_AUDIT_LOG=<path>` appends one JSON line per attempted write, allowed and
 blocked alike.
@@ -43,10 +64,10 @@ There is no TLS here. Put it behind a reverse proxy that terminates it.
 
 ## Untrusted input
 
-Video descriptions, titles and comments are written by other people and can
-contain text engineered to look like instructions to a model. Tool descriptions
-and the shipped `SKILL.md` tell the model to treat that content as data. Keep
-that in mind when wiring this into anything that runs unattended.
+Video descriptions, titles, transcripts and comments are written by other people
+and can contain text engineered to look like instructions to a model. Tool
+descriptions and the shipped `SKILL.md` tell the model to treat that content as
+data. Keep that in mind when wiring this into anything that runs unattended.
 
 ## Good-faith research
 

@@ -155,7 +155,7 @@ export const researchTools: AnyToolSpec[] = [
 
   defineTool({
     name: "analyze_channel",
-    title: "Analyse a channel's performance",
+    title: "Analyze a channel's performance",
     description:
       "Score a channel's recent videos against its OWN median views, so you can see which ones genuinely outperformed rather than which are simply oldest. Returns a multiple per video, so 3.2x means it did three times that channel's normal numbers. Use this before modelling anyone's content. Shorts are flagged because their views are not comparable to long-form on the same channel.",
     schema: {
@@ -226,7 +226,7 @@ export const researchTools: AnyToolSpec[] = [
         `${r.multiple.toFixed(2)}x · ${r.views.toLocaleString()} views · ${r.published}${r.isShort ? " · short" : ""}\n${r.title}\nhttps://youtu.be/${r.id}`;
 
       return [
-        `${c.snippet?.title} — ${num(c.statistics?.subscriberCount)?.toLocaleString() ?? "hidden"} subscribers`,
+        `${c.snippet?.title} · ${num(c.statistics?.subscriberCount)?.toLocaleString() ?? "hidden"} subscribers`,
         `scored ${scored.length} recent videos, median ${med.toLocaleString()} views`,
         "",
         "## Beat the median",

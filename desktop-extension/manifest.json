@@ -1,0 +1,91 @@
+{
+  "manifest_version": "0.2",
+  "name": "youtube",
+  "display_name": "YouTube",
+  "version": "2.0.0",
+  "description": "YouTube MCP server and CLI for Claude Code and AI agents. Transcripts with no setup, channel research, comments, analytics and multi-channel management.",
+  "long_description": "Connects Claude to YouTube.\n\nTranscripts work on any public video with no credentials at all. An API key adds search, channel lookup and comments on any video. Connecting your own channels through OAuth adds your uploads, analytics, comment replies and video edits, for as many channels as you run.\n\nReplying to a comment and deleting a video are public or permanent, so both refuse to run without an explicit confirmation.",
+  "author": {
+    "name": "Navid Moazzez",
+    "url": "https://navid.me"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thenavidm/youtube-mcp-cli"
+  },
+  "homepage": "https://github.com/thenavidm/youtube-mcp-cli",
+  "documentation": "https://github.com/thenavidm/youtube-mcp-cli#readme",
+  "support": "https://github.com/thenavidm/youtube-mcp-cli/issues",
+  "license": "MIT",
+  "keywords": [
+    "youtube",
+    "transcripts",
+    "youtube-api",
+    "analytics",
+    "mcp"
+  ],
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/server/index.js"
+      ],
+      "env": {
+        "YOUTUBE_API_KEY": "${user_config.api_key}",
+        "YOUTUBE_CLIENT_ID": "${user_config.client_id}",
+        "YOUTUBE_CLIENT_SECRET": "${user_config.client_secret}",
+        "YOUTUBE_ACCOUNTS": "${user_config.accounts}",
+        "YOUTUBE_READ_ONLY": "${user_config.read_only}"
+      }
+    }
+  },
+  "user_config": {
+    "api_key": {
+      "type": "string",
+      "title": "YouTube API key",
+      "description": "From your Google Cloud project, with the YouTube Data API v3 enabled. Adds search, channel lookup and comments. Leave empty for transcripts only.",
+      "sensitive": true,
+      "required": false
+    },
+    "client_id": {
+      "type": "string",
+      "title": "OAuth client ID",
+      "description": "Only for your own channels. The client that issued your refresh tokens.",
+      "required": false
+    },
+    "client_secret": {
+      "type": "string",
+      "title": "OAuth client secret",
+      "sensitive": true,
+      "required": false,
+      "description": "Only for your own channels. The secret of that same OAuth client."
+    },
+    "accounts": {
+      "type": "string",
+      "title": "Channels",
+      "description": "The JSON array `youtube-cli login --print` prints, one entry per channel. Channels already saved by `youtube-cli login` on this machine are read automatically.",
+      "sensitive": true,
+      "required": false
+    },
+    "read_only": {
+      "type": "boolean",
+      "title": "Read only",
+      "description": "Hide every tool that can edit, reply or delete.",
+      "default": false,
+      "required": false
+    }
+  },
+  "compatibility": {
+    "claude_desktop": ">=0.10.0",
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "node": ">=20"
+    }
+  }
+}

@@ -107,7 +107,7 @@ export const transcriptTools: AnyToolSpec[] = [
     name: "get_transcripts",
     title: "Get several transcripts",
     description:
-      "Fetch transcripts for up to 20 videos in one call. A video with no captions is reported in place rather than failing the batch. Use it to compare how a set of videos open, or to build a corpus before analysing it.",
+      "Fetch transcripts for up to 20 videos in one call. A video with no captions is reported in place rather than failing the batch. Use it to compare how a set of videos open, or to build a corpus before analyzing it.",
     schema: {
       videos: z.array(video).min(1).max(20).describe("Up to 20 video ids or URLs."),
       language: z.string().optional(),

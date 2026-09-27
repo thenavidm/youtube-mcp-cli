@@ -15,3 +15,6 @@ ai-agents
 llm-tools
 typescript
 content-creation
+cli
+command-line-tool
+youtube-cli

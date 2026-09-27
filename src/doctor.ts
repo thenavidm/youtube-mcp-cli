@@ -1,5 +1,5 @@
 /**
- * `youtube-mcp doctor` — say what is set up and what is not, in the order that
+ * `youtube-cli doctor`: say what is set up and what is not, in the order that
  * matters. Most setup problems here are a missing API in the Cloud project or
  * an OAuth client that does not match the token, and neither is obvious from
  * the error the API returns at call time.
@@ -9,6 +9,7 @@ import { loadConfig } from "./config.js";
 import { isAvailable } from "./youtube/ytdlp.js";
 import { fetchTranscript } from "./youtube/transcripts.js";
 import { YouTubeClient } from "./youtube/api.js";
+import { storePath } from "./accounts/store.js";
 
 const ok = (s: string) => `  ok    ${s}`;
 const bad = (s: string) => `  FAIL  ${s}`;
@@ -40,7 +41,9 @@ export async function doctor(): Promise<number> {
   lines.push("");
   lines.push("Public research");
   if (!config.apiKey) {
-    lines.push(info("YOUTUBE_API_KEY not set — search and channel lookup are unavailable."));
+    lines.push(
+      info("No API key: search and channel lookup are unavailable. Run `youtube-cli login --api-key KEY`."),
+    );
   } else {
     try {
       const client = new YouTubeClient({ apiKey: config.apiKey });
@@ -53,9 +56,9 @@ export async function doctor(): Promise<number> {
   }
 
   lines.push("");
-  lines.push("Connected channels");
+  lines.push(`Connected channels (saved logins live in ${storePath()})`);
   if (config.accounts.length === 0) {
-    lines.push(info("None connected — account tools and Analytics are unavailable."));
+    lines.push(info("None connected: account tools and Analytics are unavailable. Run `youtube-cli login`."));
   } else {
     for (const account of config.accounts) {
       try {
@@ -76,7 +79,7 @@ export async function doctor(): Promise<number> {
 
   if (config.readOnly) {
     lines.push("");
-    lines.push(info("YOUTUBE_READ_ONLY=1 — every write is disabled."));
+    lines.push(info("YOUTUBE_READ_ONLY=1: every write is disabled."));
   }
 
   console.log(lines.join("\n"));

@@ -3,9 +3,9 @@
  *
  * Two credential paths, and which one you have decides which tools work:
  *
- *   API key   — anyone's public data. Search, channels, public video stats.
+ *   API key:  anyone's public data. Search, channels, public video stats.
  *               No consent screen, no user. Cheapest to set up.
- *   OAuth     — your own channels. Uploads, playlists, comments as the owner,
+ *   OAuth:    your own channels. Uploads, playlists, comments as the owner,
  *               and Analytics, which has no API-key path at all.
  *
  * Multi-account is the default rather than a feature. A creator with several
@@ -29,12 +29,17 @@ export class YouTubeApiError extends Error {
     super(message);
     this.name = "YouTubeApiError";
   }
+
+  /** The shape the CLI prints on stderr, so a script parses one thing. */
+  toJSON(): { error: string; status: number; reason?: string } {
+    return { error: this.message, status: this.status, ...(this.reason ? { reason: this.reason } : {}) };
+  }
 }
 
 /**
  * Turn Google's error envelope into something a person can act on.
  *
- * The raw messages are unhelpfully generic — "The request cannot be completed
+ * The raw messages are unhelpfully generic: "The request cannot be completed
  * because you have exceeded your quota" does not tell you that quota resets at
  * midnight Pacific, and `quotaExceeded` vs `rateLimitExceeded` need different
  * responses from the caller.
@@ -54,10 +59,10 @@ function explain(status: number, reason: string | undefined, message: string): s
     case "videoNotFound":
     case "channelNotFound":
     case "playlistNotFound":
-      return `Not found — check the id. (${message})`;
+      return `Not found. Check the id. (${message})`;
     default:
       return status === 403
-        ? `${message} — usually a missing scope or a disabled API in the Cloud project.`
+        ? `${message}. Usually a missing scope or a disabled API in the Cloud project.`
         : message;
   }
 }
@@ -148,18 +153,17 @@ export class YouTubeClient {
     if (account) {
       headers.Authorization = `Bearer ${await this.accessToken(account)}`;
     } else if (init.requireAuth) {
-      throw new YouTubeApiError(
-        "This action needs a connected account. Run `youtube-mcp auth` or set YOUTUBE_ACCOUNTS.",
-        401,
-        "authError",
+      // A plain Error, not a 401: nothing was rejected, nothing was set up. The
+      // CLI maps "no ... is configured" to exit 10, which is what a script needs
+      // to tell "run login first" apart from "your token expired".
+      throw new Error(
+        "No account is configured for this action. Run `youtube-cli login` once per channel, or set YOUTUBE_ACCOUNTS.",
       );
     } else if (this.creds.apiKey) {
       url.searchParams.set("key", this.creds.apiKey);
     } else {
-      throw new YouTubeApiError(
-        "No credentials. Set YOUTUBE_API_KEY for public data, or connect an account for anything on your own channel.",
-        401,
-        "authError",
+      throw new Error(
+        "No API key is configured. Run `youtube-cli login --api-key KEY` or set YOUTUBE_API_KEY for public data, or `youtube-cli login` for your own channels.",
       );
     }
 

@@ -1,11 +1,12 @@
 {
-  "name": "@thenavidm/youtube-mcp",
-  "version": "1.0.0",
-  "description": "MCP server for YouTube. Transcripts with no setup, channel research, and full multi-channel account management. Works with Claude Code, Claude Desktop, Cursor, Windsurf, and any MCP-compatible client.",
+  "name": "@thenavidm/youtube-mcp-cli",
+  "version": "2.0.0",
+  "description": "YouTube MCP server and CLI for Claude Code, Codex and AI agents. 16 tools for transcripts, search, channel research, comments, analytics and multi-channel management.",
   "type": "module",
   "main": "./dist/index.js",
   "bin": {
-    "youtube-mcp": "./dist/index.js"
+    "youtube-mcp": "dist/index.js",
+    "youtube-cli": "dist/index.js"
   },
   "engines": {
     "node": ">=20"
@@ -17,11 +18,14 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "build:mcpb": "bash desktop-extension/build.sh",
+    "check:counts": "node scripts/check-counts.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.18.0",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "zod-to-json-schema": "^3.24.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
@@ -29,14 +33,14 @@
     "vitest": "^2.1.0"
   },
   "license": "MIT",
-  "author": "Navid Moazzez <https://navid.me>",
+  "author": "Navid Moazzez (https://navid.me)",
   "homepage": "https://navid.me",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/thenavidm/youtube-mcp.git"
+    "url": "git+https://github.com/thenavidm/youtube-mcp-cli.git"
   },
   "bugs": {
-    "url": "https://github.com/thenavidm/youtube-mcp/issues"
+    "url": "https://github.com/thenavidm/youtube-mcp-cli/issues"
   },
   "keywords": [
     "mcp",
@@ -48,7 +52,9 @@
     "claude",
     "claude-code",
     "ai-agents",
-    "llm-tools"
+    "llm-tools",
+    "cli",
+    "youtube-cli"
   ],
   "files": [
     "dist",

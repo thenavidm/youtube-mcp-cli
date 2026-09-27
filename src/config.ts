@@ -1,17 +1,18 @@
 /**
  * Configuration.
  *
- * Everything is environment variables, because that is what MCP clients can
- * set. There is no config file to get out of sync with the client's own JSON.
+ * Channels come from two places, and both are read on every start:
  *
- * Credentials resolve in this order, most specific first:
+ *   YOUTUBE_ACCOUNTS       JSON array, several channels at once
+ *   YOUTUBE_REFRESH_TOKEN  one channel
+ *   ~/.youtube-mcp-cli/    every channel saved by `youtube-cli login`
  *
- *   YOUTUBE_ACCOUNTS      JSON array — several channels at once
- *   YOUTUBE_REFRESH_TOKEN one channel, the common case
- *   YOUTUBE_API_KEY       public data only, no account
- *
- * Transcripts need none of these.
+ * An env channel wins over a saved one with the same id, so a client config can
+ * always override the store. The API key is YOUTUBE_API_KEY, else the one saved
+ * by `youtube-cli login --api-key`. Transcripts need none of these.
  */
+
+import { loadStore, type Store } from "./accounts/store.js";
 
 export type Account = {
   /** Stable key used by the `account` tool parameter. Channel handle or name. */
@@ -59,7 +60,22 @@ function oauthClient(): { id: string; secret: string } {
   return { id, secret };
 }
 
-function parseAccounts(): Account[] {
+/** Env channels first, then saved ones whose id the env has not already claimed. */
+function parseAccounts(store: Store): Account[] {
+  const fromEnv = envAccounts();
+  const saved = store.channels
+    .filter((c) => c.refresh_token && !fromEnv.some((e) => e.id === c.id))
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      clientId: c.client_id,
+      clientSecret: c.client_secret,
+      refreshToken: c.refresh_token,
+    }));
+  return [...fromEnv, ...saved];
+}
+
+function envAccounts(): Account[] {
   const { id: defaultId, secret: defaultSecret } = oauthClient();
 
   const raw = process.env.YOUTUBE_ACCOUNTS?.trim();
@@ -107,9 +123,10 @@ function parseAccounts(): Account[] {
 }
 
 export function loadConfig(): Config {
+  const store = loadStore();
   return {
-    apiKey: process.env.YOUTUBE_API_KEY?.trim() || undefined,
-    accounts: parseAccounts(),
+    apiKey: process.env.YOUTUBE_API_KEY?.trim() || store.api_key || undefined,
+    accounts: parseAccounts(store),
     readOnly: bool(process.env.YOUTUBE_READ_ONLY, false),
     allowDestructive: bool(process.env.YOUTUBE_ALLOW_DESTRUCTIVE, true),
     requestTimeoutMs: Number(process.env.YOUTUBE_REQUEST_TIMEOUT_MS ?? 30000),

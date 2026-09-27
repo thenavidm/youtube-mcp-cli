@@ -8,7 +8,7 @@
  * The trade is that it is not a supported API. YouTube changes the watch page
  * shape occasionally and this has to follow. Everything here is written to fail
  * as "no transcript" rather than to throw, because a missing transcript is a
- * normal outcome — plenty of videos genuinely have no captions.
+ * normal outcome: plenty of videos genuinely have no captions.
  *
  * Do not confuse this with the Captions API (`captions.download`), which the
  * account tools use. That one needs OAuth AND channel ownership, so it can only

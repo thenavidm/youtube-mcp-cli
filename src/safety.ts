@@ -35,8 +35,14 @@ export type Risk =
   /** Public the moment it runs, or gone for good. */
   | "destructive";
 
+/** Which surface a call came through, so a refusal names the right way to confirm. */
+export type GuardSurface = "mcp" | "cli";
+
 export class WriteGuard {
-  constructor(private readonly config: Config) {}
+  constructor(
+    private readonly config: Config,
+    private readonly surface: GuardSurface = "mcp",
+  ) {}
 
   get readOnly(): boolean {
     return this.config.readOnly;
@@ -61,8 +67,9 @@ export class WriteGuard {
       }
       if (confirm !== true) {
         this.audit(tool, summary, "blocked: no confirm");
+        const how = this.surface === "cli" ? "--confirm" : "confirm: true";
         throw new WriteBlockedError(
-          `${tool} is public or irreversible, so it will not run without confirm: true. About to: ${summary}. Call again with confirm: true if that is what was asked for.`,
+          `${tool} is public or irreversible, so it will not run without ${how}. About to: ${summary}. Run it again with ${how} if that is what was asked for.`,
         );
       }
     }
