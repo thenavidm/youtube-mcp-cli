@@ -211,8 +211,9 @@ A browser opens, you pick the channel, and it is saved. **Run `youtube-cli
 login` once per channel.** Then `youtube-cli list-accounts` shows them all.
 [Section 10](#10-several-channels-) covers using several.
 
-You do not need Google to verify the app. Testing mode is the correct end state
-for a tool you run yourself.
+You do not need Google to verify the app, but do click **Publish app** under
+**Audience**. An app left in testing issues refresh tokens that expire after
+seven days, so login would stop working every week.
 
 ## 4. Connect your client 🔌
 

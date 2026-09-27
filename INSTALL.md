@@ -142,7 +142,9 @@ with a message about the app being blocked, which reads like your account is at
 fault when it is not.
 
 You do not need to submit for verification. Verification is for handing an app
-to strangers. Testing mode is the correct end state for a tool you run yourself.
+to strangers. Do click **Publish app** under **Audience**, though: an app left in
+testing issues refresh tokens that expire after seven days. Keep the test users
+listed either way.
 
 ## 7. Create the OAuth client
 
