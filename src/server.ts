@@ -4,7 +4,7 @@ import { WriteGuard } from "./safety.js";
 import { makeContext, registerAll } from "./tools/kit.js";
 import { ALL_TOOLS } from "./tools/index.js";
 
-export const VERSION = "2.0.0";
+export const VERSION = "2.0.1";
 
 export type BuiltServer = {
   server: McpServer;

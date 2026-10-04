@@ -1,12 +1,13 @@
 {
   "name": "@thenavidm/youtube-mcp-cli",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "YouTube MCP server and CLI for Claude Code, Codex and AI agents. 16 tools for transcripts, search, channel research, comments, analytics and multi-channel management.",
   "type": "module",
   "main": "./dist/index.js",
   "bin": {
     "youtube-mcp": "dist/index.js",
-    "youtube-cli": "dist/index.js"
+    "youtube-cli": "dist/index.js",
+    "youtube-mcp-cli": "dist/npx.js"
   },
   "engines": {
     "node": ">=20"
