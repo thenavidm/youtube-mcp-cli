@@ -9,6 +9,10 @@
 | yt-dlp, for transcripts | any current release |
 | Node | >= 22 |
 
+## 3.0.1, 2026-10-05
+
+- **The package carries only what 3.0 runs.** 3.0.0 was published from a working copy whose `dist` still held 2.0's CLI, server, write guard and HTTP transport. Nothing loaded them, but they imported the MCP SDK that 3.0 no longer depends on. Publishing now clears `dist` before it builds.
+
 ## 3.0.0, 2026-10-05
 
 Built on [Slipway](https://github.com/thenavidm/slipway) 0.1.10. The 16 tools keep their names and arguments, and every difference below was measured against 2.0.0, the last version on npm, before release.
