@@ -1,4 +1,4 @@
-<img src="https://cdn.navid.media/connectors/youtube-icon.png" alt="YouTube" width="88">
+<img src="https://cdn.navid.me/connectors/youtube-icon.png" alt="YouTube" width="88">
 
 # YouTube MCP Server & CLI
 
@@ -18,7 +18,7 @@ does not return.
 
 Connect as many channels as you run, with one login each and no config file.
 
-Built and maintained by [Navid Moazzez](https://navid.me?utm_source=github&utm_medium=readme&utm_campaign=youtube-mcp-cli).
+Built and maintained by [Navid Moazzez](https://navid.me?utm_source=github&utm_medium=referral&utm_campaign=youtube-mcp-cli&utm_content=readme). Built on [Slipway](https://github.com/thenavidm/slipway), which turns one definition of each tool into the MCP server and the CLI.
 
 ```
 You: what does this video actually say about pricing?
@@ -59,7 +59,7 @@ errors are JSON on stderr whichever output you pick.
 receives for that tool, which is how you can check the two surfaces really are
 one thing.
 
-### MCP server, for AI agents
+### MCP server, for your AI app
 
 `youtube-mcp` is what Claude Code, Claude Desktop, Cursor and the rest launch.
 You never run it by hand:
@@ -69,6 +69,9 @@ claude mcp add youtube -- npx -y @thenavidm/youtube-mcp-cli@latest
 ```
 
 Then just ask: _"which of this channel's last 30 videos actually overperformed?"_
+
+Replying to a comment and deleting a video wait for your approval in the client,
+as [section 9](#9-writing-safely-) explains.
 
 Channels you connected with `youtube-cli login` on this machine are read
 automatically, so the command needs no credentials. Every other client is in
@@ -85,7 +88,24 @@ automatically, so the command needs no credentials. Every other client is in
 They are the same program reading the same tool definitions, so anything one
 can do, the other can.
 
-## Contents 📑
+## Features
+
+Every tool is both a command and an MCP tool, with the same name. The command
+is the tool name with dashes.
+
+| Capability | CLI command | MCP tool |
+|---|---|---|
+| Transcripts of any public video, no credentials | `youtube-cli get-transcript` / `get-transcripts` / `search-transcript` / `list-transcript-languages` | `get_transcript` / `get_transcripts` / `search_transcript` / `list_transcript_languages` |
+| Research any channel or video | `youtube-cli search-videos` / `get-channel` / `analyze-channel` / `get-video` | `search_videos` / `get_channel` / `analyze_channel` / `get_video` |
+| Your channels and their numbers | `youtube-cli list-accounts` / `get-my-channel` / `get-channel-analytics` / `list-my-videos` | `list_accounts` / `get_my_channel` / `get_channel_analytics` / `list_my_videos` |
+| Comments | `youtube-cli list-comments` / `reply-to-comment` | `list_comments` / `reply_to_comment` |
+| Edit or delete your videos | `youtube-cli update-video` / `delete-video` | `update_video` / `delete_video` |
+| Connect a channel or an API key | `youtube-cli login` / `logout` | not tools |
+| Check your setup | `youtube-cli doctor` | not a tool |
+
+All 16 are in [section 7](#7-tools-).
+
+## Contents
 
 | # | Section | What is in it |
 |---|---|---|
@@ -406,12 +426,12 @@ not: check the client before reconnecting anything.
 Both surfaces are the same program with the same 16 tools. The
 difference is when the model pays for them. Measured in Claude Code:
 
-| | MCP server | CLI |
+| Cost | MCP server | CLI |
 |---|---|---|
-| Every message, with every tool loaded | 5,000 tokens | nothing |
+| Every message, with every tool loaded | 4,500 tokens | nothing |
 | Every message, Claude Code's default | 490 tokens | nothing |
-| When YouTube comes up | nothing more, or the tools it picks | 2,300 tokens for `SKILL.md`, once |
-| 20 messages with YouTube in 1, every tool loaded | 100,000 tokens | 2,300 tokens |
+| When YouTube comes up | nothing more, or the tools it picks | 2,350 tokens for `SKILL.md`, once |
+| 20 messages with YouTube in 1, every tool loaded | 90,000 tokens | 2,350 tokens |
 
 Claude Code's [tool search](https://code.claude.com/docs/en/mcp#scale-with-mcp-tool-search)
 is on by default: it sends only the tool names and the server instructions,
@@ -424,11 +444,25 @@ To spend less, turn the server off when you are not using it, which in Claude
 Code is the `/mcp` panel. `YOUTUBE_READ_ONLY=1` takes the 3 write tools off the list, leaving 13.
 Or install the CLI and add the server on the days it earns its place.
 
-Measured on 2026-09-27 with Claude Code 2.1.257 on Claude Opus 5: one
+Measured on 2026-10-05 with Claude Code 2.1.286 on Claude Opus 5.5: one
 short prompt with and without the server connected, once with
 `ENABLE_TOOL_SEARCH=false` and once with the default, the difference read
 from the API's own usage figures. `SKILL.md` was measured the same way. Other
 apps and models count tokens a little differently.
+
+Against 2.0.0, measured the same day: every tool loaded costs 4,458 tokens
+instead of 4,984, tool search 489 instead of 493, and `SKILL.md` 93 more,
+because it now says how approval works over MCP and lists every exit code. In
+Codex 0.159.3 on gpt-6.1-sol, the same task, "find the command that scores a
+channel's recent videos against that channel's own median, and the flags it
+requires", read a median of 83,295 input tokens on 3.0.0 against 83,565 on
+2.0.0 over the CLI, five runs each: Codex now asks `which` instead of reading
+the full command list, and the general help is shorter. Over MCP, Codex prints
+the tool list with a script and answers from that printout, 6,133 tokens on
+3.0.0 against 6,126; the 7 more are the description of `confirm` on the two
+irreversible tools. The input totals, a median of 45,053 against 44,924, also
+carry the model's reasoning into its second request, which three of the five
+2.0.0 runs skipped; the two that kept it read 45,065 and 45,074.
 
 ## 7. Tools 🛠️
 
@@ -500,21 +534,26 @@ Everything a script needs to branch on.
 | `--select a,b.c` | only the named fields of a JSON result, dotted paths descend |
 
 Results go to stdout. Errors go to stderr, always as JSON, so one parse handles
-both outcomes:
+both outcomes. `code` names the kind of failure, and `hint` and `details`, such
+as Google's own reason, come along when there is one:
 
 ```json
-{ "error": "No API key is configured. Run `youtube-cli login --api-key KEY` or set YOUTUBE_API_KEY for public data, or `youtube-cli login` for your own channels." }
+{
+  "error": "No API key is configured. Run `youtube-cli login --api-key KEY` or set YOUTUBE_API_KEY for public data, or `youtube-cli login` for your own channels.",
+  "code": "not_configured"
+}
 ```
 
 | Code | Means |
 |---|---|
 | `0` | it worked |
-| `2` | you typed it wrong, or a guarded write was refused for want of `--confirm` |
+| `1` | an unexpected error |
+| `2` | you typed it wrong, an unknown command, a write hidden by `YOUTUBE_READ_ONLY`, or a guarded write refused for want of `--confirm` |
 | `3` | not found |
 | `4` | authentication failed: reconnect the channel |
 | `5` | an API error upstream |
 | `7` | rate limited or out of quota: wait |
-| `10` | nothing configured: run `youtube-cli login` or `login --api-key` |
+| `10` | nothing configured: run `youtube-cli login` or `login --api-key`, or install yt-dlp for transcripts |
 
 So a script can tell a mistake it should fix from a failure it should retry:
 
@@ -534,19 +573,27 @@ Writes work by default, because managing a channel is the point.
 
 Two tools are guarded: `reply_to_comment`, because it is public the moment it
 lands and notifies someone, and `delete_video`, because YouTube removes a video
-immediately with no trash and no undo. Both refuse without `--confirm` in the
-terminal or `confirm: true` through MCP. The CLI goes through the same guard as
-the server, so the rules are identical.
+immediately with no trash and no undo. Both wait for your approval. The CLI goes
+through the same guard as the server, so the rules are identical.
+
+Over MCP a person approves each of the two where the client can ask: Claude Code
+(2.1.246 and later) shows its own prompt, and a client that can show forms asks
+with an approval form whose one box starts unticked. Each approval is signed,
+bound to that exact call and works once. Where a client can do neither, the
+model's `confirm: true` counts, and it should pass it only when you asked for
+that exact reply or delete. `YOUTUBE_CONFIRM=model` makes `confirm: true` enough
+everywhere, for an agent with no person to ask. In a terminal it is `--confirm`,
+which `--agent` never adds.
 
 `update_video` is not guarded. A title is one keystroke to put back, and asking
-to confirm reversible things teaches a model to confirm everything reflexively,
-which is worse protection than not asking.
+to approve reversible things teaches people and models to approve everything
+reflexively, which is worse protection than not asking.
 
 | Setting | Effect |
 |---|---|
 | `YOUTUBE_READ_ONLY=1` | Every write disappears from the tool list and the command list |
 | `YOUTUBE_ALLOW_DESTRUCTIVE=0` | `update_video` stays, the two irreversible tools are blocked |
-| `YOUTUBE_AUDIT_LOG=<path>` | One JSON line per attempted write, allowed and blocked alike |
+| `YOUTUBE_AUDIT_LOG=<path>` | One JSON line per attempted write, allowed and blocked alike, and who approved it |
 
 Comments, titles, descriptions and transcripts are written by other people. The
 tool descriptions and the shipped `SKILL.md` tell the model to treat them as
@@ -671,6 +718,11 @@ are in its output.
 | A command refuses and lists your channels | Two or more are connected. Pass `--account` |
 | Every write command has vanished | `YOUTUBE_READ_ONLY=1` is set |
 | Server missing in Claude Desktop | Use the absolute path to `npx`, check the JSON, and fully quit the app |
+| "will not run without --confirm" | Working as intended: a reply is public and a delete is permanent. See [section 9](#9-writing-safely-) |
+| `claude -p` will not reply or delete | Headless Claude Code refuses tools that need a person. Give that agent `YOUTUBE_CONFIRM=model` |
+| No approval form appears | The client cannot show forms, so the model's `confirm: true` counts, and only for an action you asked for |
+| YouTube asks yt-dlp to prove it is not a bot | Set `YOUTUBE_YTDLP_COOKIES` to a cookies.txt exported from a browser signed in to YouTube |
+| A piped request gets no answer | Stdin closed before the answer. The MCP stdio binding stops a server when its input ends; keep stdin open until you read the answer, or use the CLI |
 
 ## Environment variables
 
@@ -697,7 +749,8 @@ you ran `youtube-cli login`.
 |---|---|---|
 | `YOUTUBE_READ_ONLY` | `0` | `1` hides every write |
 | `YOUTUBE_ALLOW_DESTRUCTIVE` | `1` | `0` blocks the two irreversible tools |
-| `YOUTUBE_AUDIT_LOG` | none | Append-only log of every attempted write |
+| `YOUTUBE_AUDIT_LOG` | none | Append-only log of every attempted write, and who approved it |
+| `YOUTUBE_CONFIRM` | `human` | `model` lets `confirm: true` alone approve over MCP, for an agent with no person to ask |
 
 **Tuning**
 
@@ -706,11 +759,16 @@ you ran `youtube-cli login`.
 | `YOUTUBE_REQUEST_TIMEOUT_MS` | `30000` | Per-request deadline |
 | `YOUTUBE_TRANSCRIPT_LANG` | `en` | Default transcript language |
 | `YOUTUBE_YTDLP_PATH` | `yt-dlp` on PATH | Where yt-dlp is |
+| `YOUTUBE_YTDLP_COOKIES` | none | A cookies.txt from a browser signed in to YouTube, for when YouTube asks yt-dlp to prove it is not a bot |
 | `YOUTUBE_MCP_HOME` | `~/.youtube-mcp-cli` | Where `login` saves channels |
 | `YOUTUBE_OAUTH_PORT` | `8765` | The localhost port `login` listens on |
 | `YOUTUBE_HTTP_PORT` | `8787` | For `--http` |
 | `YOUTUBE_HTTP_HOST` | `127.0.0.1` | For `--http` |
-| `YOUTUBE_HTTP_TOKEN` | none | Bearer token required by `--http` |
+| `YOUTUBE_HTTP_TOKEN` | none | Bearer token for `--http`. Any address but localhost refuses to start without one |
+| `YOUTUBE_HTTP_ALLOWED_ORIGINS` | none | Comma-separated browser origins allowed to connect; a page from any other site is refused |
+| `YOUTUBE_SURFACE` | `full` | `search` lists three tools that find, describe and run the rest |
+| `YOUTUBE_TOOL_TIMEOUT_MS` | none | Give up on any tool after this long |
+| `YOUTUBE_DEBUG` | `0` | `1` prints debug lines on stderr |
 
 ## Versions
 
@@ -791,10 +849,11 @@ afternoon by hand.
 <details>
 <summary><b>Can it delete one of my videos by accident?</b></summary>
 
-It cannot delete anything without `--confirm` or `confirm: true`, which a model
-has to set deliberately after reading a description saying the action is
-permanent. If you want the possibility gone entirely, set `YOUTUBE_READ_ONLY=1`
-and every write disappears.
+It cannot delete anything without your approval: Claude Code shows its own
+prompt for each delete, a client that can show forms asks with one, and
+elsewhere the model has to pass `confirm: true` deliberately after reading a
+description saying the action is permanent. If you want the possibility gone
+entirely, set `YOUTUBE_READ_ONLY=1` and every write disappears.
 
 </details>
 
@@ -825,6 +884,16 @@ the app to stop that, or run `youtube-cli login` again when it happens.
 </details>
 
 <details>
+<summary><b>Can it reply to a comment without me asking?</b></summary>
+
+It replies when you ask it to. A reply is public the moment it lands and
+notifies the person you replied to, so each one waits for your approval in the
+client, as a delete does. `YOUTUBE_READ_ONLY=1` removes replying, editing and
+deleting from the list entirely.
+
+</details>
+
+<details>
 <summary><b>How do I disconnect it?</b></summary>
 
 Remove the server from your client's config, run `youtube-cli logout` for each
@@ -834,19 +903,19 @@ the Cloud project removes the API key and the OAuth client together.
 
 </details>
 
-## Questions 💬
+## Questions
 
 Run into a problem or have a question? [Open an issue](https://github.com/thenavidm/youtube-mcp-cli/issues) and I will help.
 
-## About the author 👋
+## About the author
 
 Navid Moazzez is a leading AI business strategist, and the host of the AI Creator Summit, watched by 100,000+ creators. He helps creators and founders master AI and build their own AI Operating System (AI OS) to automate their business and life. He creates useful free tools, MCP servers and CLIs that creators and founders can use in their own workflows.
 
 **Links**
 
-- Personal website: [navid.me](https://navid.me?utm_source=github&utm_medium=readme&utm_campaign=youtube-mcp-cli)
-- Link in bio: [navid.bio](https://navid.bio?utm_source=github&utm_medium=readme&utm_campaign=youtube-mcp-cli)
-- Navid Media: [navid.media](https://navid.media?utm_source=github&utm_medium=readme&utm_campaign=youtube-mcp-cli)
+- Personal website: [navid.me](https://navid.me?utm_source=github&utm_medium=referral&utm_campaign=youtube-mcp-cli&utm_content=readme)
+- Link in bio: [navid.bio](https://navid.bio?utm_source=github&utm_medium=referral&utm_campaign=youtube-mcp-cli&utm_content=readme)
+- Navid Media: [navid.media](https://navid.media?utm_source=github&utm_medium=referral&utm_campaign=youtube-mcp-cli&utm_content=readme)
 - YouTube: [@thenavidm](https://youtube.com/@thenavidm?sub_confirmation=1) and [@thenavidai](https://youtube.com/@thenavidai?sub_confirmation=1)
 - X: [@thenavidm](https://x.com/thenavidm)
 - Instagram: [@thenavidm](https://instagram.com/thenavidm)
@@ -854,19 +923,19 @@ Navid Moazzez is a leading AI business strategist, and the host of the AI Creato
 
 If this is useful, star the repo and come say hi on [X](https://x.com/thenavidm).
 
-## Dependencies 📦
+## Dependencies
 
 | Library | License | What it does |
 |---|---|---|
-| [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk) | MIT | The MCP server and transports |
+| [Slipway](https://github.com/thenavidm/slipway) | Apache-2.0 | The MCP server and the CLI from one definition of each tool, with the write guard |
+| [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk) | Apache-2.0 | The MCP protocol and transports, through Slipway |
 | [zod](https://github.com/colinhacks/zod) | MIT | Tool argument schemas and validation |
-| [zod-to-json-schema](https://github.com/StefanTerdell/zod-to-json-schema) | ISC | Turns those schemas into what an MCP client receives |
 
 [yt-dlp](https://github.com/yt-dlp/yt-dlp) is an optional external command, used
 only to fetch caption tracks. It is not bundled and is never loaded into this
 process.
 
-## License ⚖️
+## License
 
 [MIT](./LICENSE). Free to use, modify, and share.
 

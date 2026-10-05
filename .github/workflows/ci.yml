@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
-        node: [20, 22]
+        node: [22, 24]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
@@ -42,11 +42,12 @@ jobs:
       - run: npm ci
       - run: npm run build
 
+      # Each step keeps stdin open while the request is answered: the MCP stdio binding stops a server whose input has ended.
       - name: Server starts and lists every tool
         run: |
-          printf '%s\n%s\n' \
+          (printf '%s\n%s\n' \
             '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
-            '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
+            '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'; sleep 5) \
             | node dist/index.js 2>/dev/null \
             | node -e '
               let raw = "";
@@ -75,9 +76,9 @@ jobs:
         env:
           YOUTUBE_READ_ONLY: "1"
         run: |
-          printf '%s\n%s\n' \
+          (printf '%s\n%s\n' \
             '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
-            '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
+            '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'; sleep 5) \
             | node dist/index.js 2>/dev/null \
             | node -e '
               let raw = "";
@@ -96,9 +97,9 @@ jobs:
       - name: Transcripts work with no credentials
         run: |
           pipx install yt-dlp || pip install --user yt-dlp
-          printf '%s\n%s\n' \
+          (printf '%s\n%s\n' \
             '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
-            '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_transcript_languages","arguments":{"video":"dQw4w9WgXcQ"}}}' \
+            '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_transcript_languages","arguments":{"video":"dQw4w9WgXcQ"}}}'; sleep 5) \
             | node dist/index.js 2>/dev/null \
             | node -e '
               let raw = "";

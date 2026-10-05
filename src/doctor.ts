@@ -1,87 +1,84 @@
 /**
- * `youtube-cli doctor`: say what is set up and what is not, in the order that
- * matters. Most setup problems here are a missing API in the Cloud project or
- * an OAuth client that does not match the token, and neither is obvious from
- * the error the API returns at call time.
+ * `youtube-cli doctor`: check each of the three things this server can reach,
+ * the way it would reach them.
+ *
+ * Transcripts need yt-dlp and nothing else, research needs an API key, and a
+ * connected channel needs a refresh token that still works. Each fails for a
+ * different reason with a different fix, so each is checked on its own, with a
+ * real request, as 2.0 did. Slipway runs this on every `doctor`, after its own
+ * checks.
  */
 
-import { loadConfig } from "./config.js";
-import { isAvailable } from "./youtube/ytdlp.js";
-import { fetchTranscript } from "./youtube/transcripts.js";
-import { YouTubeClient } from "./youtube/api.js";
+import type { DoctorCheck } from "@thenavidm/slipway";
 import { storePath } from "./accounts/store.js";
+import type { ToolContext } from "./tools/kit.js";
+import { YouTubeClient } from "./youtube/api.js";
+import { fetchTranscript } from "./youtube/transcripts.js";
+import { isAvailable } from "./youtube/ytdlp.js";
 
-const ok = (s: string) => `  ok    ${s}`;
-const bad = (s: string) => `  FAIL  ${s}`;
-const info = (s: string) => `  --    ${s}`;
+const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
-export async function doctor(): Promise<number> {
-  const config = loadConfig();
-  const lines: string[] = [];
-  let failures = 0;
+export async function doctor({ config }: ToolContext, options: { network: boolean }): Promise<DoctorCheck[]> {
+  const checks: DoctorCheck[] = [];
 
-  lines.push("Transcripts (no credentials needed)");
-  const ytdlp = await isAvailable();
-  if (ytdlp) {
-    lines.push(ok("yt-dlp found"));
-    try {
-      const t = await fetchTranscript("dQw4w9WgXcQ");
-      lines.push(ok(`fetched a real transcript (${t.segments.length} segments)`));
-    } catch (err) {
-      failures++;
-      lines.push(bad(`transcript fetch failed: ${err instanceof Error ? err.message : String(err)}`));
-    }
-  } else {
-    failures++;
-    lines.push(
-      bad("yt-dlp not found. Install it with `brew install yt-dlp` or `pipx install yt-dlp`."),
-    );
-  }
-
-  lines.push("");
-  lines.push("Public research");
-  if (!config.apiKey) {
-    lines.push(
-      info("No API key: search and channel lookup are unavailable. Run `youtube-cli login --api-key KEY`."),
-    );
-  } else {
-    try {
-      const client = new YouTubeClient({ apiKey: config.apiKey });
-      await client.get("/videos", { part: "id", id: "dQw4w9WgXcQ" });
-      lines.push(ok("API key works"));
-    } catch (err) {
-      failures++;
-      lines.push(bad(`API key rejected: ${err instanceof Error ? err.message : String(err)}`));
-    }
-  }
-
-  lines.push("");
-  lines.push(`Connected channels (saved logins live in ${storePath()})`);
-  if (config.accounts.length === 0) {
-    lines.push(info("None connected: account tools and Analytics are unavailable. Run `youtube-cli login`."));
-  } else {
-    for (const account of config.accounts) {
+  if (await isAvailable()) {
+    checks.push({ name: "yt-dlp", ok: true, detail: "found; transcripts need nothing else" });
+    if (options.network) {
       try {
-        const client = new YouTubeClient({ account });
-        const res = await client.get<{ items?: { snippet?: { title?: string } }[] }>(
-          "/channels",
-          { part: "snippet", mine: true },
-          true,
-        );
-        const title = res.items?.[0]?.snippet?.title ?? "(no channel)";
-        lines.push(ok(`${account.name} -> ${title}`));
-      } catch (err) {
-        failures++;
-        lines.push(bad(`${account.name}: ${err instanceof Error ? err.message : String(err)}`));
+        const transcript = await fetchTranscript("dQw4w9WgXcQ");
+        checks.push({ name: "Transcripts", ok: true, detail: `fetched a real one, ${transcript.segments.length} segments` });
+      } catch (error) {
+        checks.push({ name: "Transcripts", ok: false, detail: message(error) });
       }
     }
+  } else {
+    checks.push({ name: "yt-dlp", ok: false, detail: "not found", fix: "Install it with `brew install yt-dlp` or `pipx install yt-dlp`, or set YOUTUBE_YTDLP_PATH." });
   }
 
-  if (config.readOnly) {
-    lines.push("");
-    lines.push(info("YOUTUBE_READ_ONLY=1: every write is disabled."));
+  if (!config.apiKey) {
+    checks.push({
+      name: "API key",
+      ok: false,
+      warn: true,
+      detail: "none, so search and channel lookup are unavailable",
+      fix: "Run `youtube-cli login --api-key KEY`, or set YOUTUBE_API_KEY.",
+    });
+  } else if (options.network) {
+    try {
+      await new YouTubeClient({ apiKey: config.apiKey }).get("/videos", { part: "id", id: "dQw4w9WgXcQ" });
+      checks.push({ name: "API key", ok: true, detail: "works" });
+    } catch (error) {
+      checks.push({ name: "API key", ok: false, detail: `rejected: ${message(error)}` });
+    }
+  } else {
+    checks.push({ name: "API key", ok: true, detail: "set; --network checks it" });
   }
 
-  console.log(lines.join("\n"));
-  return failures === 0 ? 0 : 1;
+  if (config.accounts.length === 0) {
+    checks.push({
+      name: "Channels",
+      ok: false,
+      warn: true,
+      detail: `none connected, so account tools and Analytics are unavailable (saved logins live in ${storePath()})`,
+      fix: "Run `youtube-cli login`, once per channel.",
+    });
+    return checks;
+  }
+  for (const account of config.accounts) {
+    if (!options.network) {
+      checks.push({ name: account.name, ok: true, detail: "connected; --network checks the token" });
+      continue;
+    }
+    try {
+      const res = await new YouTubeClient({ account }).get<{ items?: { snippet?: { title?: string } }[] }>(
+        "/channels",
+        { part: "snippet", mine: true },
+        true,
+      );
+      checks.push({ name: account.name, ok: true, detail: `connected to ${res.items?.[0]?.snippet?.title ?? "(no channel)"}` });
+    } catch (error) {
+      checks.push({ name: account.name, ok: false, detail: message(error), fix: "Run `youtube-cli login` again for this channel." });
+    }
+  }
+  return checks;
 }

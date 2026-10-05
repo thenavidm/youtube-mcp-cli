@@ -1,27 +1,41 @@
 /**
- * The seam every tool is registered through.
+ * The seam every tool goes through, now on Slipway.
  *
  * Tools are declared as data rather than registered by hand so that guarding,
- * annotations and error shaping happen in exactly one place. When they are
- * applied per tool instead, one of thirty tools eventually forgets the guard,
- * and it is the one that deletes something.
+ * annotations and error shaping happen in exactly one place, and that place is
+ * now the framework: this adapter turns each declaration into a Slipway tool,
+ * which serves both the MCP server and the CLI.
  */
 
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { z, ZodRawShape } from "zod";
+import {
+  ApiError,
+  NotConfiguredError,
+  NotFoundError,
+  RateLimitError,
+  SlipwayError,
+  httpError,
+  toSlipwayError,
+  toolkit,
+  z,
+  type Risk,
+  type Tool,
+} from "@thenavidm/slipway";
 import type { Config } from "../config.js";
-import { annotationsFor, WriteGuard, type Risk } from "../safety.js";
-import { YouTubeClient } from "../youtube/api.js";
 import { resolveAccount } from "../config.js";
+import { YouTubeApiError, YouTubeClient } from "../youtube/api.js";
+import { TranscriptError } from "../youtube/transcripts.js";
 
 export type ToolContext = {
   config: Config;
-  guard: WriteGuard;
   /** A client bound to the requested channel, or to the API key when none is asked for. */
   clientFor: (accountHint?: string) => YouTubeClient;
 };
 
-export type ToolSpec<S extends ZodRawShape> = {
+const kit = toolkit<ToolContext>();
+
+type Shape = Record<string, z.ZodType>;
+
+export type ToolSpec<S extends Shape> = {
   name: string;
   title: string;
   description: string;
@@ -33,84 +47,68 @@ export type ToolSpec<S extends ZodRawShape> = {
   handler: (args: z.infer<z.ZodObject<S>>, ctx: ToolContext) => Promise<string>;
 };
 
-export function defineTool<S extends ZodRawShape>(spec: ToolSpec<S>): ToolSpec<S> {
-  return spec;
-}
+export type AnyToolSpec = Tool<ToolContext>;
 
 /**
- * A tool of any shape, for the one place tools are collected into a list.
- *
- * `ToolSpec` is generic over its schema, so a list of tools with different
- * schemas has no single type: each handler takes a different argument shape and
- * function parameters are contravariant. The safety that matters is inside each
- * `defineTool` call, where schema and handler are checked against each other.
- * This only loosens the seam where they are gathered.
+ * Google sends a used-up quota or a rate limit as a 403, so its reason
+ * (`quotaExceeded`, `rateLimitExceeded`, `userRateLimitExceeded` and the other
+ * `...LimitExceeded`) decides before the status can read it as a rejected
+ * credential. A transcript that does not
+ * exist is not found, YouTube refusing this IP for a while is rate limited, as
+ * in 2.0, and yt-dlp not installed is setup still to do, exit 10. A plain
+ * failure from Google or yt-dlp is upstream, exit 5, as in 2.0; a bug in this
+ * code stays exit 1.
  */
-export type AnyToolSpec = Omit<ToolSpec<ZodRawShape>, "handler" | "summary"> & {
-  handler: (args: never, ctx: ToolContext) => Promise<string>;
-  summary?: (args: never) => string;
-};
-
-const ok = (text: string) => ({ content: [{ type: "text" as const, text }] });
-const fail = (error: unknown) => ({
-  content: [
-    { type: "text" as const, text: error instanceof Error ? error.message : String(error) },
-  ],
-  isError: true,
-});
-
-/** Register one tool, with guarding, annotations and error handling applied. */
-export function register(server: McpServer, ctx: ToolContext, spec: AnyToolSpec): void {
-  server.registerTool(
-    spec.name,
-    {
-      title: spec.title,
-      description: spec.description,
-      inputSchema: spec.schema,
-      annotations: {
-        title: spec.title,
-        ...annotationsFor(spec.risk, { idempotent: spec.idempotent }),
-      },
-    },
-    // The SDK derives its callback type from the schema generic. This wrapper is
-    // generic over the same shape, but TypeScript cannot prove the two equal
-    // through the indirection, so the cast lives at this single boundary rather
-    // than in every tool definition.
-    (async (args: Record<string, unknown>) => {
-      try {
-        if (spec.risk !== "read") {
-          const summary = spec.summary?.(args as never) ?? spec.name;
-          const confirm = (args as { confirm?: boolean }).confirm;
-          ctx.guard.check(spec.name, spec.risk, confirm, summary);
-        }
-        return ok(await spec.handler(args as never, ctx));
-      } catch (error) {
-        return fail(error);
-      }
-    }) as never,
-  );
-}
-
-/**
- * Register a list, dropping every write when the server is read-only.
- *
- * They are removed from the list rather than made to fail when called. A model
- * cannot misuse a tool it cannot see, and an error at call time still spends a
- * turn and still invites a retry.
- */
-export function registerAll(server: McpServer, ctx: ToolContext, specs: AnyToolSpec[]): void {
-  for (const spec of specs) {
-    if (ctx.guard.readOnly && spec.risk !== "read") continue;
-    register(server, ctx, spec);
+export function toSlipway(error: unknown): unknown {
+  if (error instanceof SlipwayError) return error;
+  if (error instanceof YouTubeApiError) {
+    const known = /quota|limitexceeded/i.test(error.reason ?? "") ? new RateLimitError(error.message) : httpError(error.status, error.message);
+    return new SlipwayError(known.message, known.code, known.exitCode, {
+      ...(known.hint ? { hint: known.hint } : {}),
+      status: error.status,
+      ...(error.reason ? { details: { reason: error.reason } } : {}),
+      cause: error,
+    });
   }
+  if (error instanceof TranscriptError) {
+    const options = { cause: error, details: { reason: error.code } };
+    if (error.code === "no_video" || error.code === "no_captions" || error.code === "language_missing") return new NotFoundError(error.message, options);
+    if (error.code === "rate_limited") return new RateLimitError(error.message, options);
+    if (error.code === "no_ytdlp") return new NotConfiguredError(error.message, options);
+    return new ApiError(error.message, options);
+  }
+  if (error instanceof Error && error.constructor === Error) {
+    const known = toSlipwayError(error);
+    return known.code === "internal" ? new ApiError(error.message, { cause: error }) : known;
+  }
+  return error;
 }
 
-export function makeContext(config: Config, guard: WriteGuard): ToolContext {
+export function defineTool<S extends Shape>(spec: ToolSpec<S>): Tool<ToolContext> {
+  const { confirm: _confirm, ...shape } = spec.schema as Shape;
+  const handler = spec.handler as (args: Record<string, unknown>, ctx: ToolContext) => Promise<string>;
+  return kit.defineTool({
+    name: spec.name,
+    title: spec.title,
+    description: spec.description,
+    input: z.object(shape),
+    risk: spec.risk,
+    ...(spec.idempotent !== undefined ? { idempotent: spec.idempotent } : {}),
+    ...(spec.summary ? { summary: spec.summary as (args: Record<string, unknown>) => string } : {}),
+    handler: async (args, ctx) => {
+      try {
+        return await handler(args, ctx);
+      } catch (error) {
+        throw toSlipway(error);
+      }
+    },
+  });
+}
+
+export function makeContext(config: Config): ToolContext {
   return {
     config,
-    guard,
-    clientFor: (hint?: string) =>
-      new YouTubeClient({ apiKey: config.apiKey, account: resolveAccount(config, hint) }),
+    clientFor: (hint?: string) => new YouTubeClient({ apiKey: config.apiKey, account: resolveAccount(config, hint) }),
   };
 }
 

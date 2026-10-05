@@ -52,7 +52,7 @@ The CLI describes itself, so nothing here needs to list 16 tools and go stale:
 ```bash
 youtube-cli                    # every command, one line each, writes marked
 youtube-cli <command> --help   # arguments, types, which are required
-youtube-cli schema <command>   # the exact JSON Schema an MCP client receives
+youtube-cli which <words>      # the command for a task, without the full list
 ```
 
 The command is the tool name with dashes: `list_comments` runs as
@@ -111,7 +111,8 @@ user.
 | Code | Meaning |
 |---|---|
 | 0 | Success |
-| 2 | Usage error, or a write refused for want of `--confirm` |
+| 1 | Unexpected error |
+| 2 | Usage error: wrong or missing arguments, an unknown command, a write hidden by `YOUTUBE_READ_ONLY=1`, or a write refused for want of `--confirm` |
 | 3 | Not found |
 | 4 | Authentication failed, reconnect the channel |
 | 5 | API error upstream |
@@ -132,7 +133,9 @@ specific thing.
 **`--confirm` is enforced, not advisory.** `reply-to-comment` is public the
 moment it lands and notifies the person. `delete-video` is final: no trash, and
 the views, comments and URL go with it. Both refuse without `--confirm`. Pass it
-when the user has actually asked, never to get past the refusal.
+when the user has actually asked, never to get past the refusal. Over MCP the
+person approves each in the client's own prompt or form; `confirm: true` counts
+only where the client cannot ask.
 
 `update-video` is not guarded, because a title is a keystroke to put back. Only
 the fields you pass change.

@@ -16,6 +16,7 @@ import {
   toTimestampedText,
 } from "../youtube/transcripts.js";
 import { defineTool, type AnyToolSpec } from "./kit.js";
+import { UsageError } from "@thenavidm/slipway";
 
 const video = z
   .string()
@@ -66,7 +67,7 @@ export const transcriptTools: AnyToolSpec[] = [
     risk: "read",
     handler: async ({ video: v }) => {
       const id = parseVideoId(v);
-      if (!id) throw new Error(`Could not read a video id out of "${v}".`);
+      if (!id) throw new UsageError(`Could not read a video id out of "${v}".`);
       const tracks = await listTracks(id);
       if (tracks.length === 0) return "This video has no captions.";
       return tracks

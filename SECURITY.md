@@ -39,10 +39,14 @@ until you revoke it at
 Writes work by default, because managing a channel is the point of the tool.
 There are 13 read tools and 3 that write.
 
-`reply_to_comment` and `delete_video` require confirmation, because neither can
-be taken back: `confirm: true` through MCP, `--confirm` in the terminal. The CLI
-goes through the same guard as the server, so the rules are identical on both
-surfaces. `update_video` needs neither, because it is reversible.
+`reply_to_comment` and `delete_video` wait for your approval, because neither can
+be taken back. Over MCP a person approves each where the client can ask: Claude
+Code shows its own prompt, and a client that can show forms asks with one. Each
+approval is signed, bound to that exact call and works once. Where a client can
+do neither, the model must pass `confirm: true`, and `YOUTUBE_CONFIRM=model`
+allows that everywhere. In the terminal it is `--confirm`. The CLI goes through
+the same guard as the server, so the rules are identical on both surfaces.
+`update_video` needs none of this, because it is reversible.
 
 `YOUTUBE_READ_ONLY=1` removes every write tool from the list rather than failing
 at call time. Use it when pointing an agent you do not fully trust at a real
@@ -52,13 +56,15 @@ channel.
 irreversible ones outright.
 
 `YOUTUBE_AUDIT_LOG=<path>` appends one JSON line per attempted write, allowed and
-blocked alike.
+blocked alike, with who approved it.
 
 ## Running it over HTTP
 
-`--http` binds to `127.0.0.1` unless `YOUTUBE_HTTP_HOST` says otherwise. Set
-`YOUTUBE_HTTP_TOKEN` before you change the host. Without a token, anyone who can
-reach the port can act on every connected channel.
+`--http` binds to `127.0.0.1` unless `YOUTUBE_HTTP_HOST` says otherwise, and will
+not start on any other address without `YOUTUBE_HTTP_TOKEN`, which it then
+requires as a bearer token. Without one, anyone who can reach the port could act
+on every connected channel. It also refuses a request from a page on another
+site unless `YOUTUBE_HTTP_ALLOWED_ORIGINS` lists it.
 
 There is no TLS here. Put it behind a reverse proxy that terminates it.
 

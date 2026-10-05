@@ -2,9 +2,9 @@
   "manifest_version": "0.2",
   "name": "youtube",
   "display_name": "YouTube",
-  "version": "2.0.1",
+  "version": "3.0.0",
   "description": "YouTube MCP server and CLI for Claude Code and AI agents. Transcripts with no setup, channel research, comments, analytics and multi-channel management.",
-  "long_description": "Connects Claude to YouTube.\n\nTranscripts work on any public video with no credentials at all. An API key adds search, channel lookup and comments on any video. Connecting your own channels through OAuth adds your uploads, analytics, comment replies and video edits, for as many channels as you run.\n\nReplying to a comment and deleting a video are public or permanent, so both refuse to run without an explicit confirmation.",
+  "long_description": "Connects Claude to YouTube.\n\nTranscripts work on any public video with no credentials at all. An API key adds search, channel lookup and comments on any video. Connecting your own channels through OAuth adds your uploads, analytics, comment replies and video edits, for as many channels as you run.\n\nReplying to a comment and deleting a video are public or permanent, so both wait for your approval.",
   "author": {
     "name": "Navid Moazzez",
     "url": "https://navid.me"
@@ -85,7 +85,7 @@
       "linux"
     ],
     "runtimes": {
-      "node": ">=20"
+      "node": ">=22"
     }
   }
 }

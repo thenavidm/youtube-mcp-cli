@@ -27,7 +27,7 @@ still holds.
 
 ## 1. Install the package
 
-Node 20 or newer.
+Node 22 or newer.
 
 For an MCP client you install nothing: the client runs it through `npx`, which
 fetches it on demand, so there is nothing to update later.

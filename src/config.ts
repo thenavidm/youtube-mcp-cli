@@ -13,6 +13,7 @@
  */
 
 import { loadStore, type Store } from "./accounts/store.js";
+import { NotConfiguredError, UsageError } from "@thenavidm/slipway";
 
 export type Account = {
   /** Stable key used by the `account` tool parameter. Channel handle or name. */
@@ -84,12 +85,12 @@ function envAccounts(): Account[] {
     try {
       parsed = JSON.parse(raw);
     } catch {
-      throw new Error(
+      throw new NotConfiguredError(
         "YOUTUBE_ACCOUNTS is not valid JSON. It should be an array like " +
           '[{"name":"Main","refresh_token":"1//..."}].',
       );
     }
-    if (!Array.isArray(parsed)) throw new Error("YOUTUBE_ACCOUNTS must be a JSON array.");
+    if (!Array.isArray(parsed)) throw new NotConfiguredError("YOUTUBE_ACCOUNTS must be a JSON array.");
 
     return parsed.map((entry, i) => {
       const a = entry as Record<string, string | undefined>;
@@ -152,7 +153,7 @@ export function resolveAccount(config: Config, requested?: string): Account | un
       accounts.find((a) => a.id === want || a.name.toLowerCase() === want) ??
       accounts.find((a) => a.name.toLowerCase().includes(want) || a.id.includes(want));
     if (!match) {
-      throw new Error(
+      throw new UsageError(
         `No connected channel matches "${requested}". Connected: ${accounts.map((a) => a.name).join(", ")}. Call list_accounts to see them.`,
       );
     }
@@ -160,7 +161,7 @@ export function resolveAccount(config: Config, requested?: string): Account | un
   }
 
   if (accounts.length > 1) {
-    throw new Error(
+    throw new UsageError(
       `${accounts.length} channels are connected (${accounts.map((a) => a.name).join(", ")}). Pass account=<name or @handle> so this runs against the right one.`,
     );
   }

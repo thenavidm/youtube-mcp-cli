@@ -16,6 +16,7 @@
 import { z } from "zod";
 import { durationToSeconds } from "../youtube/api.js";
 import { clamp, defineTool, type AnyToolSpec } from "./kit.js";
+import { NotFoundError } from "@thenavidm/slipway";
 
 type SearchItem = { id?: { videoId?: string } };
 type VideoItem = {
@@ -137,7 +138,7 @@ export const researchTools: AnyToolSpec[] = [
         ...channelQuery(args.channel),
       });
       const c = res.items?.[0];
-      if (!c) throw new Error(`No channel found for "${args.channel}".`);
+      if (!c) throw new NotFoundError(`No channel found for "${args.channel}".`);
       return [
         c.snippet?.title,
         c.snippet?.customUrl ? `@${c.snippet.customUrl.replace(/^@/, "")}` : null,
@@ -172,7 +173,7 @@ export const researchTools: AnyToolSpec[] = [
       });
       const c = chan.items?.[0];
       const uploads = c?.contentDetails?.relatedPlaylists?.uploads;
-      if (!c || !uploads) throw new Error(`No channel found for "${args.channel}".`);
+      if (!c || !uploads) throw new NotFoundError(`No channel found for "${args.channel}".`);
 
       const want = args.limit ?? 30;
       const ids: string[] = [];
@@ -252,7 +253,7 @@ export const researchTools: AnyToolSpec[] = [
         id,
       });
       const v = res.items?.[0];
-      if (!v) throw new Error(`No video found for "${args.video}".`);
+      if (!v) throw new NotFoundError(`No video found for "${args.video}".`);
       const secs = durationToSeconds(v.contentDetails?.duration);
       return [
         v.snippet?.title,

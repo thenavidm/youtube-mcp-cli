@@ -133,6 +133,8 @@ export async function fetchCaptions(
         "json3",
         "--no-warnings",
         "--no-playlist",
+        // The bot check's own error names this setting: a cookies.txt exported from a signed-in browser.
+        ...(process.env.YOUTUBE_YTDLP_COOKIES?.trim() ? ["--cookies", process.env.YOUTUBE_YTDLP_COOKIES.trim()] : []),
         "-o",
         join(dir, "cap"),
         `https://www.youtube.com/watch?v=${videoId}`,
@@ -149,7 +151,7 @@ export async function fetchCaptions(
       }
       if (/Sign in to confirm|bot/i.test(stderr)) {
         throw new Error(
-          "YouTube asked yt-dlp to prove it is not a bot. Pass cookies with YOUTUBE_YTDLP_COOKIES, or retry later.",
+          "YouTube asked yt-dlp to prove it is not a bot. Set YOUTUBE_YTDLP_COOKIES to a cookies.txt exported from a browser signed in to YouTube, or retry later.",
         );
       }
       throw new Error(

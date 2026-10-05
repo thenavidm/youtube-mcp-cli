@@ -9,6 +9,7 @@
 
 import { z } from "zod";
 import { clamp, defineTool, type AnyToolSpec } from "./kit.js";
+import { AuthError, NotFoundError } from "@thenavidm/slipway";
 
 const account = z
   .string()
@@ -57,7 +58,7 @@ export const accountTools: AnyToolSpec[] = [
         }[];
       }>("/channels", { part: "snippet,statistics,contentDetails", mine: true }, true);
       const c = res.items?.[0];
-      if (!c) throw new Error("This token does not own a channel.");
+      if (!c) throw new AuthError("This token does not own a channel.");
       return [
         c.snippet?.title,
         c.snippet?.customUrl ? `@${c.snippet.customUrl.replace(/^@/, "")}` : null,
@@ -127,7 +128,7 @@ export const accountTools: AnyToolSpec[] = [
       const client = ctx.clientFor(args.account);
       const chan = await client.get<Uploads>("/channels", { part: "contentDetails", mine: true }, true);
       const uploads = chan.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
-      if (!uploads) throw new Error("Could not find the uploads playlist for this channel.");
+      if (!uploads) throw new NotFoundError("Could not find the uploads playlist for this channel.");
 
       const page = await client.get<{ items?: { contentDetails?: { videoId?: string } }[] }>(
         "/playlistItems",
@@ -224,7 +225,7 @@ export const accountTools: AnyToolSpec[] = [
         }[];
       }>("/videos", { part: "snippet,status", id: args.video_id }, true);
       const existing = current.items?.[0];
-      if (!existing) throw new Error(`No video ${args.video_id} on this channel.`);
+      if (!existing) throw new NotFoundError(`No video ${args.video_id} on this channel.`);
 
       const parts = args.privacy_status ? "snippet,status" : "snippet";
       await client.put("/videos", { part: parts }, {

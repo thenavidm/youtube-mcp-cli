@@ -1,174 +1,123 @@
 /**
- * The CLI adapter.
+ * The two surfaces, now that Slipway builds both from ALL_TOOLS.
  *
- * What matters here is that the shell surface is derived from the tool specs
- * rather than described a second time, so the tests that count are the ones
- * asserting parity with ALL_TOOLS and the ones covering the argv shapes a
- * person actually types.
+ * Parsing, help and the exit-code contract are Slipway's and tested there. What
+ * matters here: every tool arrives on both surfaces intact, the two
+ * irreversible tools still ask first, 2.0's `auth` and `logout` still work,
+ * Google's errors keep their exit codes, and the docs stay in step with the code.
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { z } from "zod";
-import { EXIT, exitCodeFor, flagsFor, parseArgs, isCliCommand } from "../src/cli.js";
+import { EXIT } from "@thenavidm/slipway";
+import { checkApp, cli, connect } from "@thenavidm/slipway/testing";
+import { app } from "../src/app.js";
 import { ALL_TOOLS } from "../src/tools/index.js";
+import { toSlipway } from "../src/tools/kit.js";
+import { YouTubeApiError } from "../src/youtube/api.js";
+import { TranscriptError } from "../src/youtube/transcripts.js";
 
-describe("flagsFor", () => {
-  it("derives a flag per schema key, kebab-cased", () => {
-    const flags = flagsFor({ reply_to: z.string().optional() });
-    expect(flags[0]).toMatchObject({ key: "reply_to", flag: "--reply-to", kind: "string" });
+/** Nothing here may read a real saved login. */
+const env = { YOUTUBE_MCP_HOME: mkdtempSync(join(tmpdir(), "youtube-home-")) };
+
+describe("YouTube on Slipway", () => {
+  it("offers every tool as a command and over MCP, under the same names", async () => {
+    const list = await cli(app, [], { env });
+    for (const tool of ALL_TOOLS) expect(list.stdout).toContain(tool.command);
+    const mcp = await connect(app, { env });
+    const names = (await mcp.listTools()).map((tool) => tool.name).sort();
+    await mcp.close();
+    expect(names).toEqual(ALL_TOOLS.map((tool) => tool.name).sort());
   });
 
-  it("reads required from the absence of .optional()", () => {
-    const flags = flagsFor({ text: z.string(), account: z.string().optional() });
-    expect(flags.find((f) => f.key === "text")?.required).toBe(true);
-    expect(flags.find((f) => f.key === "account")?.required).toBe(false);
+  it("refuses to delete a video without --confirm, before anything reaches YouTube", async () => {
+    const run = await cli(app, ["delete-video", "--video-id", "abc"], { env });
+    expect(run.code).toBe(2);
+    expect(JSON.parse(run.stderr).code).toBe("refused");
+    expect(run.stderr).toContain("permanently delete video abc");
   });
 
-  it("carries .describe() through as help", () => {
-    const flags = flagsFor({ text: z.string().describe("The post body.") });
-    expect(flags[0]?.help).toBe("The post body.");
+  it("asks for approval on the two irreversible tools and on no other", async () => {
+    const mcp = await connect(app, { env });
+    const tools = await mcp.listTools();
+    await mcp.close();
+    const confirming = tools.filter((tool) => "confirm" in ((tool.inputSchema as { properties?: object }).properties ?? {})).map((tool) => tool.name);
+    expect(confirming.sort()).toEqual(["delete_video", "reply_to_comment"]);
   });
 
-  it("finds the description whichever side of .optional() it was chained", () => {
-    const outer = flagsFor({ a: z.string().optional().describe("outer") });
-    const inner = flagsFor({ b: z.string().describe("inner").optional() });
-    expect(outer[0]?.help).toBe("outer");
-    expect(inner[0]?.help).toBe("inner");
+  it("hides every write when YOUTUBE_READ_ONLY is set", async () => {
+    const mcp = await connect(app, { env: { ...env, YOUTUBE_READ_ONLY: "1" } });
+    const tools = await mcp.listTools();
+    await mcp.close();
+    expect(tools.length).toBe(ALL_TOOLS.filter((tool) => tool.risk === "read").length);
   });
 
-  it("exposes an enum's values as choices", () => {
-    const flags = flagsFor({ reply_control: z.enum(["everyone", "nobody"]).optional() });
-    expect(flags[0]).toMatchObject({ kind: "enum", choices: ["everyone", "nobody"] });
+  it("keeps 2.0's auth and logout, and logout names what to pass", async () => {
+    expect((await cli(app, ["--help"], { env })).stdout).toContain("youtube-cli logout <channel> | logout --api-key");
+    expect((await cli(app, ["auth", "--help"], { env })).stdout).toContain("Usage: youtube-cli auth [--api-key KEY]");
+    expect((await cli(app, ["--help"], { env })).stdout).not.toContain("youtube-cli auth");
+    expect((await cli(app, ["logout"], { env })).code).toBe(2);
   });
 
-  it("marks a scalar array repeatable and an object array json", () => {
-    const flags = flagsFor({
-      langs: z.array(z.string()).optional(),
-      images: z.array(z.object({ url: z.string() })).optional(),
-    });
-    expect(flags.find((f) => f.key === "langs")).toMatchObject({ kind: "string", repeatable: true });
-    expect(flags.find((f) => f.key === "images")).toMatchObject({ kind: "json", repeatable: true });
-  });
-});
-
-describe("parseArgs", () => {
-  const flags = flagsFor({
-    text: z.string(),
-    limit: z.number().optional(),
-    confirm: z.boolean().optional(),
-    langs: z.array(z.string()).optional(),
-    link: z.object({ uri: z.string() }).optional(),
-    reply_control: z.enum(["everyone", "nobody"]).optional(),
-  });
-
-  it("accepts --flag value and --flag=value alike", () => {
-    expect(parseArgs(["--text", "hi"], flags)).toEqual({ text: "hi" });
-    expect(parseArgs(["--text=hi"], flags)).toEqual({ text: "hi" });
-  });
-
-  it("accepts the underscore spelling of a flag", () => {
-    expect(parseArgs(["--reply_control", "nobody"], flags)).toEqual({ reply_control: "nobody" });
-  });
-
-  it("treats a boolean as a bare switch", () => {
-    expect(parseArgs(["--text", "hi", "--confirm"], flags)).toEqual({ text: "hi", confirm: true });
-    expect(parseArgs(["--confirm=false"], flags)).toEqual({ confirm: false });
-  });
-
-  it("coerces numbers, and refuses ones that are not", () => {
-    expect(parseArgs(["--limit", "25"], flags)).toEqual({ limit: 25 });
-    expect(() => parseArgs(["--limit", "many"], flags)).toThrow(/expects a number/);
-  });
-
-  it("parses a json flag, and refuses malformed json", () => {
-    expect(parseArgs(['--link={"uri":"https://x.com"}'], flags)).toEqual({
-      link: { uri: "https://x.com" },
-    });
-    expect(() => parseArgs(["--link", "{oops"], flags)).toThrow(/expects JSON/);
-  });
-
-  it("collects a repeatable flag into an array", () => {
-    expect(parseArgs(["--langs", "en", "--langs", "sv"], flags)).toEqual({ langs: ["en", "sv"] });
-  });
-
-  it("checks an enum against its choices", () => {
-    expect(() => parseArgs(["--reply-control", "friends"], flags)).toThrow(/expects one of/);
-  });
-
-  it("fills the first required flag from a bare argument", () => {
-    expect(parseArgs(["hello"], flags)).toEqual({ text: "hello" });
-  });
-
-  it("wraps a bare argument when the required flag is repeatable", () => {
-    const repeatable = flagsFor({ actors: z.array(z.string()) });
-    expect(parseArgs(["bsky.app"], repeatable)).toEqual({ actors: ["bsky.app"] });
-  });
-
-  it("refuses an unknown option rather than dropping it", () => {
-    expect(() => parseArgs(["--nope", "x"], flags)).toThrow(/Unknown option/);
-  });
-
-  it("refuses a second bare argument", () => {
-    expect(() => parseArgs(["one", "two"], flags)).toThrow(/Unexpected argument/);
+  it("passes slipway check", async () => {
+    const report = await checkApp(app, { env });
+    expect(report.findings.filter((finding) => finding.level === "error")).toEqual([]);
   });
 });
 
-describe("parity with the MCP surface", () => {
-  it("routes every tool name, in both spellings", () => {
-    for (const tool of ALL_TOOLS) {
-      expect(isCliCommand([tool.name])).toBe(true);
-      expect(isCliCommand([tool.name.replace(/_/g, "-")])).toBe(true);
-    }
+describe("Google's errors keep their exit codes", () => {
+  it.each([
+    ["a used-up quota, sent as a 403", new YouTubeApiError("Daily API quota is used up.", 403, "quotaExceeded"), EXIT.rateLimited],
+    ["a per-user rate limit, sent as a 403", new YouTubeApiError("User rate limit exceeded.", 403, "userRateLimitExceeded"), EXIT.rateLimited],
+    ["a missing scope", new YouTubeApiError("Your token lacks the scope.", 403, "insufficientPermissions"), EXIT.auth],
+    ["an expired token", new YouTubeApiError("The access token is invalid or expired.", 401, "authError"), EXIT.auth],
+    ["a missing video", new YouTubeApiError("Not found. Check the id.", 404, "videoNotFound"), EXIT.notFound],
+    ["a bad argument", new YouTubeApiError("Invalid value.", 400, "invalidParameter"), EXIT.usage],
+    ["a video with no captions", new TranscriptError("This video has no captions.", "no_captions"), EXIT.notFound],
+    ["a blocked transcript fetch", new TranscriptError("YouTube blocked the request.", "blocked"), EXIT.api],
+    ["YouTube rate limiting transcripts from this IP", new TranscriptError("YouTube is rate limiting transcript requests from this IP.", "rate_limited"), EXIT.rateLimited],
+    ["yt-dlp not installed", new TranscriptError("yt-dlp is not installed.", "no_ytdlp"), EXIT.notConfigured],
+    ["yt-dlp failing", new Error("yt-dlp failed: unknown error"), EXIT.api],
+    ["nothing configured", new Error("No API key is configured. Run `youtube-cli login --api-key KEY`."), EXIT.notConfigured],
+  ])("%s", (_name, raw, code) => {
+    expect((toSlipway(raw) as { exitCode: number }).exitCode).toBe(code);
   });
 
-  it("builds flags for every tool without throwing", () => {
-    for (const tool of ALL_TOOLS) {
-      expect(() => flagsFor(tool.schema)).not.toThrow();
-    }
-  });
-
-  it("gives every schema key a flag", () => {
-    for (const tool of ALL_TOOLS) {
-      expect(flagsFor(tool.schema)).toHaveLength(Object.keys(tool.schema).length);
-    }
-  });
-
-  it("leaves the server's own flags alone", () => {
-    expect(isCliCommand(["--http"])).toBe(false);
-    expect(isCliCommand(["--version"])).toBe(false);
-    expect(isCliCommand([])).toBe(false);
+  it("leaves a bug in this code as unexpected", () => {
+    expect(toSlipway(new TypeError("x is undefined"))).toBeInstanceOf(TypeError);
   });
 });
 
 describe("documentation stays in step with the code", () => {
   const read = (p: string): string => readFileSync(new URL(p, import.meta.url), "utf-8");
-  const names = (text: string): Set<string> => new Set(text.match(/YOUTUBE_[A-Z_]+/g) ?? []);
+  const names = (text: string): Set<string> => new Set((text.match(/YOUTUBE_[A-Z_]+/g) ?? []).filter((name) => !name.endsWith("_")));
+  const source = (dir: string): string =>
+    readdirSync(new URL(dir, import.meta.url), { withFileTypes: true })
+      .map((entry) => (entry.isDirectory() ? source(`${dir}${entry.name}/`) : entry.name.endsWith(".ts") ? read(`${dir}${entry.name}`) : ""))
+      .join("\n");
 
-  /**
-   * Two variables shipped undocumented and five never reached `--help`, which is
-   * the kind of drift nobody notices because both sides look complete on their own.
-   */
-  it("documents every environment variable the code reads", () => {
-    const used = names(["config.ts", "transport/http.ts"].map((f) => read(`../src/${f}`)).join("\n"));
+  /** Every variable the server reads: this repo's code, and Slipway's as agent-context lists them. */
+  const used = async (): Promise<Set<string>> => {
+    const context = JSON.parse((await cli(app, ["agent-context"], { env })).stdout);
+    return new Set([...names(source("../src/")), ...context.settings.map((setting: { env: string }) => setting.env)]);
+  };
+
+  it("documents every environment variable the code reads", async () => {
     const documented = names(read("../README.md"));
-    expect([...used].filter((v) => !documented.has(v))).toEqual([]);
+    expect([...(await used())].filter((v) => !documented.has(v))).toEqual([]);
   });
 
-  it("lists every environment variable in --help", () => {
-    const used = names(["config.ts", "transport/http.ts"].map((f) => read(`../src/${f}`)).join("\n"));
-    const helped = names(read("../src/index.ts"));
-    // The help groups the three HTTP ones as `YOUTUBE_HTTP_PORT / _HOST / _TOKEN`.
-    const shorthand = new Set(["YOUTUBE_HTTP_HOST", "YOUTUBE_HTTP_TOKEN"]);
-    expect([...used].filter((v) => !helped.has(v) && !shorthand.has(v))).toEqual([]);
+  it("lists every environment variable in --help", async () => {
+    const help = (await cli(app, ["--help"], { env })).stdout;
+    // The help groups the HTTP ones as `YOUTUBE_HTTP_PORT / _HOST / _TOKEN / _ALLOWED_ORIGINS`.
+    const shorthand = new Set(["YOUTUBE_HTTP_HOST", "YOUTUBE_HTTP_TOKEN", "YOUTUBE_HTTP_ALLOWED_ORIGINS"]);
+    expect([...(await used())].filter((v) => !help.includes(v) && !shorthand.has(v))).toEqual([]);
   });
 
-  /**
-   * Two in-page links pointed at headings that had been renamed, including the
-   * one row routing a shell user to the CLI. The ship checklist's link pass only
-   * greps http, so a dead `#anchor` is the kind that ships quietly.
-   */
   it.each(["../README.md", "../INSTALL.md"])("has no dead in-page anchors in %s", (file) => {
+    if (!existsSync(new URL(file, import.meta.url))) return; // repo may ship one doc
     const md = read(file);
     const slugs = new Set<string>();
     for (const [, heading] of md.matchAll(/^#{2,4} (.+)$/gm)) {
@@ -181,13 +130,5 @@ describe("documentation stays in step with the code", () => {
       .map((m) => m[1] as string)
       .filter((a) => !slugs.has(a));
     expect(dead).toEqual([]);
-  });
-});
-
-describe("a used-up quota is a rate limit, not a credential problem", () => {
-  it("maps Google's 403 quotaExceeded to 7", () => {
-    expect(exitCodeFor({ status: 403, reason: "quotaExceeded", message: "Daily API quota is used up." })).toBe(EXIT.rateLimited);
-    expect(exitCodeFor({ status: 403, reason: "rateLimitExceeded", message: "Too many requests too quickly." })).toBe(EXIT.rateLimited);
-    expect(exitCodeFor({ status: 403, reason: "insufficientPermissions", message: "Your token lacks the scope." })).toBe(EXIT.auth);
   });
 });

@@ -5,46 +5,49 @@ channel management, as MCP tools and as shell commands.
 
 ## Shape
 
-TypeScript, Node 20+, ESM. Published as `@thenavidm/youtube-mcp-cli`, with two
+TypeScript, Node 22+, ESM, built on [Slipway](https://github.com/thenavidm/slipway). Published as `@thenavidm/youtube-mcp-cli`, with two
 binaries on one file: `youtube-mcp` (the server) and `youtube-cli` (the
 commands). stdio and streamable HTTP. Tests run against fakes, never the network.
 
 ```
 src/
-  index.ts            entry for both binaries: login, logout, doctor, then CLI or server
-  server.ts           assembles the server and its instructions
-  cli.ts              the shell surface, derived from ALL_TOOLS
+  index.ts            entry for both binaries: turns on the compile cache, starts the app
+  app.ts              the Slipway app: tools, settings, login, logout, doctor. Slipway
+                      serves MCP, the CLI and --http, and owns the guard, approvals,
+                      annotations and the audit log
+  guide.ts            the server instructions
   config.ts           env plus the saved channels into settings and accounts
-  safety.ts           WriteGuard: confirm gating, read-only, audit log, annotations
   auth.ts             login (OAuth, saved per channel) and logout
   doctor.ts           reports each credential layer separately
   accounts/store.ts   the encrypted channel file in ~/.youtube-mcp-cli
   youtube/            API client, transcripts, the yt-dlp transport
-  tools/              kit.ts is the seam, index.ts is ALL_TOOLS, one module per group
-  transport/http.ts
+  tools/              kit.ts adapts them to Slipway and maps errors to exit codes,
+                      index.ts is ALL_TOOLS, one module per group
 scripts/check-counts.mjs  fails when a document's tool count disagrees with the server
 ```
 
 ## The things worth knowing before changing anything
 
-**One array, two surfaces.** `tools/index.ts` exports `ALL_TOOLS`. `register()`
-in `tools/kit.ts` turns each spec into an MCP tool and `cli.ts` turns the same
-spec into a command, through the same handler and the same `WriteGuard`. Add a
-tool to the array and it is a command too. Never describe a tool a second time.
+**One array, two surfaces.** `tools/index.ts` exports `ALL_TOOLS`, and Slipway
+turns each into an MCP tool and a command, through the same handler and the same
+guard. Add a tool to the array and it is a command too. Never describe a tool a
+second time.
 
-**`cli.ts` is copied, not written.** It comes from the shared MCP plus CLI asset.
-Change it only where YouTube genuinely differs, and keep the exit codes as they
-are: 0 ok, 2 usage or a refused write, 3 not found, 4 auth, 5 API, 7 rate
-limited, 10 nothing configured.
+**Exit codes are the house contract**: 0 ok, 1 unexpected, 2 usage or a refused
+write, 3 not found, 4 auth, 5 API, 7 rate limited, 10 nothing configured.
+`tools/kit.ts` decides which a YouTube failure is: a used-up quota is 7 even as
+a 403, a missing transcript, channel or video is 3, and a plain failure from
+Google or yt-dlp is 5.
 
-**Read-only removes tools rather than refusing them.** `registerAll` skips every
-non-read spec when `YOUTUBE_READ_ONLY=1`, and the CLI hides the same ones. A
-model cannot misuse a tool it cannot see.
+**Read-only removes tools rather than refusing them.** Slipway leaves every
+write off both surfaces when `YOUTUBE_READ_ONLY=1`. A model cannot misuse a tool
+it cannot see.
 
-**Confirmation goes on irreversible tools only.** Currently `reply_to_comment`
-and `delete_video`. Not on `update_video`. The test is whether the user could
-undo it from youtube.com in one action. The guard knows its surface, so a
-refusal says `--confirm` in a terminal and `confirm: true` through MCP.
+**Approval goes on irreversible tools only.** Currently `reply_to_comment` and
+`delete_video`. Not on `update_video`. The test is whether the user could undo
+it from youtube.com in one action. Over MCP a person approves each where the
+client can ask; the refusal says `--confirm` in a terminal and `confirm: true`
+through MCP.
 
 **Channels come from env and from the store.** `config.ts` reads
 `YOUTUBE_ACCOUNTS` or `YOUTUBE_REFRESH_TOKEN`, then every channel saved by

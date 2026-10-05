@@ -1,6 +1,6 @@
 {
   "name": "@thenavidm/youtube-mcp-cli",
-  "version": "2.0.1",
+  "version": "3.0.0",
   "description": "YouTube MCP server and CLI for Claude Code, Codex and AI agents. 16 tools for transcripts, search, channel research, comments, analytics and multi-channel management.",
   "type": "module",
   "main": "./dist/index.js",
@@ -10,7 +10,7 @@
     "youtube-mcp-cli": "dist/npx.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "build": "tsc",
@@ -24,9 +24,8 @@
     "check:counts": "node scripts/check-counts.mjs"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.18.0",
-    "zod": "^3.23.8",
-    "zod-to-json-schema": "^3.24.1"
+    "@thenavidm/slipway": "^0.1.10",
+    "zod": "^4.2.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
@@ -55,7 +54,11 @@
     "ai-agents",
     "llm-tools",
     "cli",
-    "youtube-cli"
+    "youtube-cli",
+    "mcp-cli",
+    "transcripts",
+    "youtube-data-api",
+    "slipway"
   ],
   "files": [
     "dist",
