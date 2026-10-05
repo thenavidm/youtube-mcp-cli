@@ -103,7 +103,7 @@ is the tool name with dashes.
 | Connect a channel or an API key | `youtube-cli login` / `logout` | not tools |
 | Check your setup | `youtube-cli doctor` | not a tool |
 
-All 16 are in [section 7](#7-tools-).
+All 16 are in [section 7](#7-tools-%EF%B8%8F).
 
 ## Contents
 
@@ -115,11 +115,11 @@ All 16 are in [section 7](#7-tools-).
 | 4 | [Connect your client](#4-connect-your-client-) | Claude, Cursor, Windsurf, the rest |
 | 5 | [Check it worked](#5-check-it-worked-) | And the two things that fail |
 | 6 | [Which surface, and what each costs](#6-which-surface-and-what-each-costs-) | Measured in Claude Code, and how to spend less |
-| 7 | [Tools](#7-tools-) | All 16, grouped by what they need |
+| 7 | [Tools](#7-tools-%EF%B8%8F) | All 16, grouped by what they need |
 | 8 | [Output and exit codes](#8-output-and-exit-codes-) | What scripts branch on |
 | 9 | [Writing safely](#9-writing-safely-) | What is guarded and what is not |
 | 10 | [Several channels](#10-several-channels-) | Login once each, pick by name |
-| 11 | [Notes and gotchas](#11-notes-and-gotchas-) | How YouTube really behaves |
+| 11 | [Notes and gotchas](#11-notes-and-gotchas-%EF%B8%8F) | How YouTube really behaves |
 | 12 | [Your data](#12-your-data-) | What is stored, and where |
 | 13 | [Troubleshooting](#13-troubleshooting-) | Symptom to cause |
 | 14 | [FAQ](#14-faq-) | Including what an MCP server is |
