@@ -2,12 +2,17 @@
 
 | Component | Version |
 |---|---|
-| Slipway | ^0.1.10 |
+| Slipway | ^0.1.17 |
 | MCP TypeScript SDK, through Slipway | 2.3.0 |
 | YouTube Data API | v3 |
 | YouTube Analytics API | v2 |
 | yt-dlp, for transcripts | any current release |
 | Node | >= 22 |
+
+## 3.0.2, 2026-10-05
+
+- **Built on Slipway 0.1.17**, which a fresh install of 3.0.1 already used. Since the Slipway 3.0.1 was measured on, 0.1.10, `which` also reads a tool's argument names and prints a title once where a description opens with it, and the general help names the settings that connect an account and the safety switches and counts the rest, which `agent-context` describes one by one. [Slipway's changelog](https://github.com/thenavidm/slipway/blob/main/CHANGELOG.md) lists the rest.
+- **A test checks that every setting is named in `--help` or described by `agent-context`**, where it asked `--help` to name each one.
 
 ## 3.0.1, 2026-10-05
 

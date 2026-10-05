@@ -1,6 +1,6 @@
 {
   "name": "@thenavidm/youtube-mcp-cli",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "YouTube MCP server and CLI for Claude Code, Codex and AI agents. 16 tools for transcripts, search, channel research, comments, analytics and multi-channel management.",
   "type": "module",
   "main": "./dist/index.js",
@@ -24,7 +24,7 @@
     "check:counts": "node scripts/check-counts.mjs"
   },
   "dependencies": {
-    "@thenavidm/slipway": "^0.1.10",
+    "@thenavidm/slipway": "^0.1.17",
     "zod": "^4.2.0"
   },
   "devDependencies": {
