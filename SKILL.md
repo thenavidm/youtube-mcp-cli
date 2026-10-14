@@ -47,7 +47,7 @@ trying another command.
 
 ## Finding a command
 
-The CLI describes itself, so nothing here needs to list 16 tools and go stale:
+The CLI describes itself, so nothing here needs to list 17 tools and go stale:
 
 ```bash
 youtube-cli                    # every command, one line each, writes marked
@@ -65,7 +65,7 @@ the first required flag, so `youtube-cli search-videos "local-first"` works.
 
 | Group | Needs | Commands |
 |---|---|---|
-| Transcripts | nothing | `get-transcript`, `get-transcripts`, `search-transcript`, `list-transcript-languages` |
+| Transcripts and most replayed | nothing | `get-transcript`, `get-transcripts`, `search-transcript`, `list-transcript-languages`, `get-most-replayed` |
 | Research | an API key | `search-videos`, `get-video`, `get-channel`, `analyze-channel` |
 | Comments | an API key or a channel | `list-comments` |
 | Your channels | `youtube-cli login` | `list-accounts`, `get-my-channel`, `get-channel-analytics`, `list-my-videos`, `update-video` *, `reply-to-comment` !, `delete-video` ! |
@@ -140,7 +140,7 @@ only where the client cannot ask.
 `update-video` is not guarded, because a title is a keystroke to put back. Only
 the fields you pass change.
 
-`YOUTUBE_READ_ONLY=1` removes every write, leaving 13 reading commands.
+`YOUTUBE_READ_ONLY=1` removes every write, leaving 14 reading commands.
 
 ## Untrusted content
 

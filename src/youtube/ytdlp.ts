@@ -178,3 +178,58 @@ export async function fetchCaptions(
     await rm(dir, { recursive: true, force: true });
   }
 }
+
+export type ReplayPoint = { start: number; end: number; value: number };
+export type MostReplayed = { videoId: string; title: string; seconds: number | null; views: number | null; points: ReplayPoint[] };
+
+/**
+ * YouTube's "Most replayed" graph, as yt-dlp reads it from the watch page: about
+ * 100 equal stretches of the video, each with how much it was replayed against
+ * the most replayed stretch, which is 1. It is public, so it works on anyone's
+ * video, and it is the only public trace of where viewers rewatch. YouTube shows
+ * it only once a video has enough views; below that the list is empty.
+ */
+export function parseMostReplayed(raw: string, videoId: string): MostReplayed {
+  const info = JSON.parse(raw) as {
+    title?: string;
+    duration?: number;
+    view_count?: number;
+    heatmap?: { start_time?: number; end_time?: number; value?: number }[] | null;
+  };
+  const points = (info.heatmap ?? [])
+    .filter((p) => typeof p.start_time === "number" && typeof p.end_time === "number" && typeof p.value === "number")
+    .map((p) => ({ start: p.start_time!, end: p.end_time!, value: p.value! }));
+  return {
+    videoId,
+    title: info.title ?? "",
+    seconds: typeof info.duration === "number" ? info.duration : null,
+    views: typeof info.view_count === "number" ? info.view_count : null,
+    points,
+  };
+}
+
+export async function fetchMostReplayed(videoId: string, timeoutMs = 90000): Promise<MostReplayed> {
+  const { code, stdout, stderr } = await run(
+    [
+      "--dump-json",
+      "--skip-download",
+      "--no-warnings",
+      "--no-playlist",
+      ...(process.env.YOUTUBE_YTDLP_COOKIES?.trim() ? ["--cookies", process.env.YOUTUBE_YTDLP_COOKIES.trim()] : []),
+      `https://www.youtube.com/watch?v=${videoId}`,
+    ],
+    timeoutMs,
+  );
+  if (code !== 0 || !stdout.trim()) {
+    if (/HTTP Error 429|Too Many Requests/i.test(stderr)) {
+      throw new Error("YouTube is rate limiting this IP (HTTP 429). Wait a few minutes before retrying, or run with a proxy.");
+    }
+    if (/Sign in to confirm|bot/i.test(stderr)) {
+      throw new Error(
+        "YouTube asked yt-dlp to prove it is not a bot. Set YOUTUBE_YTDLP_COOKIES to a cookies.txt exported from a browser signed in to YouTube, or retry later.",
+      );
+    }
+    throw new Error(`yt-dlp failed: ${stderr.trim().split("\n").pop() ?? "unknown error"}`);
+  }
+  return parseMostReplayed(stdout, videoId);
+}

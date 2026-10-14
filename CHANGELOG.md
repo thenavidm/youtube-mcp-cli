@@ -11,6 +11,7 @@
 
 ## Unreleased
 
+- **`get_most_replayed`**, a new read tool that needs no key or account, only yt-dlp: YouTube's public Most replayed graph for any video, about 100 stretches each scored against the most replayed one. It lists the opening, which is nearly always the top since every view starts there, then the peaks after it with a link to each second; `format: tsv` gives every stretch. YouTube shows the graph only once a video has enough views, and the tool says so when there is none. 17 tools, 14 of them read.
 - **`analyze_channel` scores Shorts and long videos each against their own median.** It took one median over both, so on a channel that posts both, every Short read as a hit or every long video as a flop, depending on which kind had the bigger numbers. The tool's own description already said the two are not comparable.
 - **`analyze_channel` takes `min_age_days`**: a video published fewer days ago is listed as too new to score and kept out of the medians, since its views are still climbing. The default, 0, scores everything as before.
 - **`analyze_channel` takes `format: tsv`** for every video as a tab-separated row (id, published, age in days, views, seconds, kind, whether scored, multiple, title). The text answer lists only the winners and the weakest five, which a script cannot rank from.

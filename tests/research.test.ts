@@ -61,3 +61,34 @@ describe("toTsv", () => {
     expect(lines[2]).toContain("One two three");
   });
 });
+
+import { parseMostReplayed } from "../src/youtube/ytdlp.js";
+import { replayPeaks } from "../src/tools/transcripts.js";
+
+describe("most replayed", () => {
+  const info = (values: number[] | null) =>
+    JSON.stringify({
+      title: "A video",
+      duration: 200,
+      view_count: 5000,
+      heatmap: values === null ? null : values.map((value, i) => ({ start_time: i * 2, end_time: i * 2 + 2, value })),
+    });
+
+  it("reads yt-dlp's heatmap into stretches", () => {
+    const m = parseMostReplayed(info([1, 0.4, 0.3]), "abc");
+    expect(m).toMatchObject({ videoId: "abc", title: "A video", seconds: 200, views: 5000 });
+    expect(m.points[1]).toEqual({ start: 2, end: 4, value: 0.4 });
+  });
+
+  it("returns no stretches when YouTube shows no graph", () => {
+    expect(parseMostReplayed(info(null), "abc").points).toEqual([]);
+    expect(parseMostReplayed(JSON.stringify({ title: "x" }), "abc").points).toEqual([]);
+  });
+
+  it("finds the peaks after the opening, highest first", () => {
+    const values = Array.from({ length: 100 }, (_, i) => (i === 0 ? 1 : i === 40 ? 0.9 : i === 70 ? 0.6 : 0.2));
+    const peaks = replayPeaks(parseMostReplayed(info(values), "abc"));
+    expect(peaks.slice(0, 2).map((p) => p.start)).toEqual([80, 140]);
+    expect(peaks.every((p) => p.start >= 10)).toBe(true);
+  });
+});

@@ -8,7 +8,7 @@
 [![X](https://img.shields.io/badge/X-@thenavidm-black?logo=x)](https://x.com/thenavidm)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-thenavidm-0A66C2?logo=linkedin&logoColor=white)](https://linkedin.com/in/thenavidm)
 
-YouTube MCP server and CLI for Claude Code and AI agents. 16 tools for transcripts, search, channel research, comments, analytics and multi-channel management.
+YouTube MCP server and CLI for Claude Code and AI agents. 17 tools for transcripts, most replayed moments, search, channel research, comments, analytics and multi-channel management.
 
 One install gives you both surfaces, the same tools under the same names.
 
@@ -95,7 +95,7 @@ is the tool name with dashes.
 
 | Capability | CLI command | MCP tool |
 |---|---|---|
-| Transcripts of any public video, no credentials | `youtube-cli get-transcript` / `get-transcripts` / `search-transcript` / `list-transcript-languages` | `get_transcript` / `get_transcripts` / `search_transcript` / `list_transcript_languages` |
+| Transcripts of any public video, no credentials | `youtube-cli get-transcript` / `get-transcripts` / `search-transcript` / `list-transcript-languages` / `get-most-replayed` | `get_transcript` / `get_transcripts` / `search_transcript` / `list_transcript_languages` / `get_most_replayed` |
 | Research any channel or video | `youtube-cli search-videos` / `get-channel` / `analyze-channel` / `get-video` | `search_videos` / `get_channel` / `analyze_channel` / `get_video` |
 | Your channels and their numbers | `youtube-cli list-accounts` / `get-my-channel` / `get-channel-analytics` / `list-my-videos` | `list_accounts` / `get_my_channel` / `get_channel_analytics` / `list_my_videos` |
 | Comments | `youtube-cli list-comments` / `reply-to-comment` | `list_comments` / `reply_to_comment` |
@@ -423,7 +423,7 @@ not: check the client before reconnecting anything.
 
 ## 6. Which surface, and what each costs 💰
 
-Both surfaces are the same program with the same 16 tools. The
+Both surfaces are the same program with the same 17 tools. The
 difference is when the model pays for them. Measured in Claude Code:
 
 | Cost | MCP server | CLI |
@@ -478,6 +478,7 @@ No credentials. Reads any public video.
 | `get-transcript` | `get_transcript` | The full transcript, as prose or timestamped lines |
 | `list-transcript-languages` | `list_transcript_languages` | Every caption language, and whether it is auto-generated |
 | `search-transcript` | `search_transcript` | Find a phrase, get timestamps that link to the second |
+| `get-most-replayed` | `get_most_replayed` | YouTube's public Most replayed graph for any video: where viewers rewatch, with a link to each peak |
 | `get-transcripts` | `get_transcripts` | Up to 20 videos in one call |
 
 ### Research
@@ -507,7 +508,7 @@ just an API key.
 | `reply-to-comment` ! | `reply_to_comment` | A public reply |
 | `delete-video` ! | `delete_video` | Permanent |
 
-That is 13 read tools and 3 write tools.
+That is 14 read tools and 3 write tools.
 
 ### Setup commands
 

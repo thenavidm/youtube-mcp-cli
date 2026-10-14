@@ -37,7 +37,7 @@ until you revoke it at
 ## The write-safety model
 
 Writes work by default, because managing a channel is the point of the tool.
-There are 13 read tools and 3 that write.
+There are 14 read tools and 3 that write.
 
 `reply_to_comment` and `delete_video` wait for your approval, because neither can
 be taken back. Over MCP a person approves each where the client can ask: Claude

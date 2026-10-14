@@ -9,14 +9,26 @@
 import { z } from "zod";
 import {
   fetchTranscript,
+  formatTimestamp,
   listTracks,
   parseVideoId,
   searchSegments,
   toPlainText,
   toTimestampedText,
 } from "../youtube/transcripts.js";
+import { fetchMostReplayed, YtDlpMissingError, type MostReplayed } from "../youtube/ytdlp.js";
 import { defineTool, type AnyToolSpec } from "./kit.js";
-import { UsageError } from "@thenavidm/slipway";
+import { NotConfiguredError, UsageError } from "@thenavidm/slipway";
+
+/** Local peaks after the opening: the opening is nearly always the top, since every view starts there. */
+export function replayPeaks(m: MostReplayed, top = 5): { start: number; end: number; value: number }[] {
+  const pts = m.points;
+  const skip = Math.ceil(pts.length * 0.05);
+  const peaks = pts.filter((p, i) => i >= skip && p.value >= (pts[i - 1]?.value ?? 0) && p.value >= (pts[i + 1]?.value ?? 0));
+  return peaks.sort((a, b) => b.value - a.value).slice(0, top);
+}
+
+const clock = (s: number) => formatTimestamp(Math.floor(s));
 
 const video = z
   .string()
@@ -132,6 +144,47 @@ export const transcriptTools: AnyToolSpec[] = [
         }
       }
       return parts.join("\n\n");
+    },
+  }),
+  defineTool({
+    name: "get_most_replayed",
+    title: "Get most replayed moments",
+    description:
+      "Read YouTube's public Most replayed graph for ANY video: about 100 stretches, each scored against the most replayed one, which is 1. It is the only public trace of where viewers rewatch, so use it on other creators' videos where analytics are not yours to read. Needs no API key or account, only yt-dlp. YouTube shows the graph only once a video has enough views; below that there is nothing to read.",
+    schema: {
+      video,
+      format: z
+        .enum(["text", "tsv"])
+        .optional()
+        .describe("text (default): the opening and the top peaks after it. tsv: every stretch as start, end, value."),
+    },
+    risk: "read",
+    handler: async ({ video: v, format }) => {
+      const id = parseVideoId(v);
+      if (!id) throw new UsageError(`Could not read a video id out of "${v}".`);
+      let m: MostReplayed;
+      try {
+        m = await fetchMostReplayed(id);
+      } catch (err) {
+        if (err instanceof YtDlpMissingError) throw new NotConfiguredError(err.message);
+        throw err;
+      }
+      if (m.points.length === 0)
+        return `video: ${id}\nYouTube shows no Most replayed graph for this video. It appears only once a video has enough views.`;
+      if (format === "tsv") return ["start\tend\tvalue", ...m.points.map((p) => `${p.start}\t${p.end}\t${p.value.toFixed(4)}`)].join("\n");
+      const step = m.points[0]!.end - m.points[0]!.start;
+      const lines = replayPeaks(m).map(
+        (p) => `[${clock(p.start)}-${clock(p.end)}] ${p.value.toFixed(2)}  https://youtu.be/${id}?t=${Math.floor(p.start)}`,
+      );
+      return [
+        `video: ${id}`,
+        m.title,
+        `${m.points.length} stretches of about ${step.toFixed(1)} seconds; 1.00 is the most replayed.`,
+        `opening [${clock(m.points[0]!.start)}-${clock(m.points[0]!.end)}]: ${m.points[0]!.value.toFixed(2)}`,
+        "",
+        "Peaks after the opening:",
+        ...(lines.length ? lines : ["none"]),
+      ].join("\n");
     },
   }),
 ].map((t) => t as AnyToolSpec);
