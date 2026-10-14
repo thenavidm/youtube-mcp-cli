@@ -51,6 +51,57 @@ function median(values: number[]): number {
   return sorted.length % 2 ? (sorted[mid] ?? 0) : ((sorted[mid - 1] ?? 0) + (sorted[mid] ?? 0)) / 2;
 }
 
+export type ChannelVideo = { id: string; title: string; published: string; views: number; seconds: number };
+export type ScoredVideo = ChannelVideo & {
+  kind: "short" | "long";
+  ageDays: number | null;
+  /** False when the video is younger than min_age_days: its views are still climbing, so it is listed, not scored. */
+  scored: boolean;
+  multiple: number | null;
+};
+
+/**
+ * Each video against the median of the same kind on the same channel. A Short's
+ * views are not comparable to a long video's, so a pooled median makes every
+ * Short look like a hit on a long-form channel and every long video look weak on
+ * a Shorts channel. Three minutes or under is treated as a Short, since a square
+ * or vertical upload up to three minutes is one; the API does not say a video's
+ * aspect ratio, so a short horizontal video counts as a Short too.
+ */
+export function scoreChannel(rows: ChannelVideo[], opts: { today?: Date; minAgeDays?: number } = {}) {
+  const today = opts.today ?? new Date();
+  const minAge = opts.minAgeDays ?? 0;
+  const withAge = rows.map((r) => {
+    const t = Date.parse(r.published);
+    const ageDays = Number.isNaN(t) ? null : Math.floor((today.getTime() - t) / 86_400_000);
+    const kind: "short" | "long" = r.seconds > 0 && r.seconds <= 180 ? "short" : "long";
+    return { ...r, kind, ageDays, scored: ageDays === null ? minAge === 0 : ageDays >= minAge };
+  });
+  const medians = {
+    short: median(withAge.filter((r) => r.kind === "short" && r.scored).map((r) => r.views)),
+    long: median(withAge.filter((r) => r.kind === "long" && r.scored).map((r) => r.views)),
+  };
+  const counts = {
+    short: withAge.filter((r) => r.kind === "short" && r.scored).length,
+    long: withAge.filter((r) => r.kind === "long" && r.scored).length,
+  };
+  const videos: ScoredVideo[] = withAge
+    .map((r) => ({ ...r, multiple: r.scored && medians[r.kind] > 0 ? r.views / medians[r.kind] : null }))
+    .sort((a, b) => (b.multiple ?? -1) - (a.multiple ?? -1));
+  return { videos, medians, counts };
+}
+
+/** Every row, tab-separated with a header, for a script to read without parsing prose. */
+export function toTsv(videos: ScoredVideo[]): string {
+  const clean = (s: string) => s.replace(/[\t\r\n]+/g, " ");
+  return [
+    "id\tpublished\tageDays\tviews\tseconds\tkind\tscored\tmultiple\ttitle",
+    ...videos.map((v) =>
+      [v.id, v.published, v.ageDays ?? "", v.views, v.seconds, v.kind, v.scored, v.multiple === null ? "" : v.multiple.toFixed(3), clean(v.title)].join("\t"),
+    ),
+  ].join("\n");
+}
+
 /** The Data API takes at most 50 ids per call. */
 function chunk<T>(items: T[], size = 50): T[][] {
   const out: T[][] = [];
@@ -158,10 +209,20 @@ export const researchTools: AnyToolSpec[] = [
     name: "analyze_channel",
     title: "Analyze a channel's performance",
     description:
-      "Score a channel's recent videos against its OWN median views, so you can see which ones genuinely outperformed rather than which are simply oldest. Returns a multiple per video, so 3.2x means it did three times that channel's normal numbers. Use this before modelling anyone's content. Shorts are flagged because their views are not comparable to long-form on the same channel.",
+      "Score a channel's recent videos against its OWN median views, so you can see which ones genuinely outperformed rather than which are simply oldest. Returns a multiple per video, so 3.2x means it did three times that channel's normal numbers. Use this before modelling anyone's content. Shorts and long videos are each scored against their own median, because their views are not comparable. Set min_age_days to leave out videos whose views are still climbing, and format tsv for every row as data.",
     schema: {
       channel: z.string().describe("@handle, channel id, or URL."),
       limit: z.number().min(5).max(200).optional().describe("How many recent videos to score. Default 30."),
+      min_age_days: z
+        .number()
+        .min(0)
+        .max(365)
+        .optional()
+        .describe("Videos published fewer days ago than this are listed but not scored, and left out of the medians. Default 0."),
+      format: z
+        .enum(["text", "tsv"])
+        .optional()
+        .describe("text (default): the winners and the weakest five. tsv: every video as a tab-separated row, for a script."),
       account,
     },
     risk: "read",
@@ -212,29 +273,27 @@ export const researchTools: AnyToolSpec[] = [
         views: num(v.statistics?.viewCount) ?? 0,
         seconds: durationToSeconds(v.contentDetails?.duration) ?? 0,
       }));
-      const med = median(rows.map((r) => r.views));
-      const scored = rows
-        .map((r) => ({
-          ...r,
-          multiple: med > 0 ? r.views / med : 0,
-          // Three minutes or under is a Short in practice, and Shorts views are
-          // not comparable to long-form on the same channel.
-          isShort: r.seconds > 0 && r.seconds <= 180,
-        }))
-        .sort((a, b) => b.multiple - a.multiple);
+      const { videos: scored, medians, counts } = scoreChannel(rows, { minAgeDays: args.min_age_days });
+      if (args.format === "tsv") return toTsv(scored);
 
-      const fmt = (r: (typeof scored)[number]) =>
-        `${r.multiple.toFixed(2)}x · ${r.views.toLocaleString()} views · ${r.published}${r.isShort ? " · short" : ""}\n${r.title}\nhttps://youtu.be/${r.id}`;
+      const fmt = (r: ScoredVideo) =>
+        `${r.multiple === null ? "not scored" : `${r.multiple.toFixed(2)}x`} · ${r.views.toLocaleString()} views · ${r.published}${r.kind === "short" ? " · short" : ""}\n${r.title}\nhttps://youtu.be/${r.id}`;
+      const kinds = (["long", "short"] as const)
+        .filter((k) => counts[k] > 0)
+        .map((k) => `${k === "long" ? "long videos" : "Shorts"}: median ${medians[k].toLocaleString()} views over ${counts[k]}`);
+      const young = scored.filter((r) => !r.scored);
+      const ranked = scored.filter((r) => r.multiple !== null);
 
       return [
         `${c.snippet?.title} · ${num(c.statistics?.subscriberCount)?.toLocaleString() ?? "hidden"} subscribers`,
-        `scored ${scored.length} recent videos, median ${med.toLocaleString()} views`,
+        `scored ${ranked.length} of ${scored.length} recent videos, each against its own kind: ${kinds.join("; ") || "none"}`,
         "",
         "## Beat the median",
-        scored.filter((r) => r.multiple > 1).map(fmt).join("\n\n") || "none",
+        ranked.filter((r) => (r.multiple ?? 0) > 1).map(fmt).join("\n\n") || "none",
         "",
         "## Weakest five",
-        scored.filter((r) => r.multiple <= 1).slice(-5).map(fmt).join("\n\n") || "none",
+        ranked.filter((r) => (r.multiple ?? 0) <= 1).slice(-5).map(fmt).join("\n\n") || "none",
+        ...(young.length ? ["", `## Too new to score (under ${args.min_age_days} days)`, young.map(fmt).join("\n\n")] : []),
       ].join("\n");
     },
   }),

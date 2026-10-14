@@ -9,6 +9,12 @@
 | yt-dlp, for transcripts | any current release |
 | Node | >= 22 |
 
+## Unreleased
+
+- **`analyze_channel` scores Shorts and long videos each against their own median.** It took one median over both, so on a channel that posts both, every Short read as a hit or every long video as a flop, depending on which kind had the bigger numbers. The tool's own description already said the two are not comparable.
+- **`analyze_channel` takes `min_age_days`**: a video published fewer days ago is listed as too new to score and kept out of the medians, since its views are still climbing. The default, 0, scores everything as before.
+- **`analyze_channel` takes `format: tsv`** for every video as a tab-separated row (id, published, age in days, views, seconds, kind, whether scored, multiple, title). The text answer lists only the winners and the weakest five, which a script cannot rank from.
+
 ## 3.0.2, 2026-10-05
 
 - **Built on Slipway 0.1.17**, which a fresh install of 3.0.1 already used. Since the Slipway 3.0.1 was measured on, 0.1.10, `which` also reads a tool's argument names and prints a title once where a description opens with it, and the general help names the settings that connect an account and the safety switches and counts the rest, which `agent-context` describes one by one. [Slipway's changelog](https://github.com/thenavidm/slipway/blob/main/CHANGELOG.md) lists the rest.

@@ -488,7 +488,7 @@ Needs an API key. Reads anyone's public data.
 |---|---|---|
 | `search-videos` | `search_videos` | Search, with view counts and duration joined on |
 | `get-channel` | `get_channel` | Subscribers, total views, video count, uploads playlist |
-| `analyze-channel` | `analyze_channel` | Recent videos scored against that channel's own median |
+| `analyze-channel` | `analyze_channel` | Recent videos scored against that channel's own median, Shorts and long videos apart; every row as data with `format: tsv` |
 | `get-video` | `get_video` | Full detail for one video |
 
 ### Your channels
@@ -674,8 +674,11 @@ access completely.
   own videos and returns nothing for anyone else's. The API does this, not a
   permission you are missing.
 - **Shorts skew channel analysis.** Their view counts are not comparable to
-  long-form on the same channel, so `analyze_channel` flags them rather than
-  quietly averaging them in.
+  long-form on the same channel, so `analyze_channel` scores Shorts against the
+  channel's Shorts and long videos against its long videos, never one pooled
+  median. A video three minutes or under counts as a Short, since the API does
+  not say a video's shape. New videos are still gaining views: `min_age_days`
+  lists them without scoring them.
 
 ## 12. Your data 💾
 
