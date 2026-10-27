@@ -60,11 +60,27 @@ function explain(status: number, reason: string | undefined, message: string): s
     case "channelNotFound":
     case "playlistNotFound":
       return `Not found. Check the id. (${message})`;
+    case "uploadLimitExceeded":
+      return "YouTube says this channel has uploaded as many videos as it may for now. Wait and try again later.";
+    case "invalidPublishAt":
+      return `YouTube refused the scheduled publishing time. publish_at must be an ISO 8601 time, and only a private video that has never been published can be scheduled. (${message})`;
     default:
       return status === 403
         ? `${message}. Usually a missing scope or a disabled API in the Cloud project.`
         : message;
   }
+}
+
+/** Google's error envelope as a YouTubeApiError, with the reason explained. */
+export function apiError(status: number, text: string): YouTubeApiError {
+  let data: { error?: { message?: string; errors?: { reason?: string }[] } } = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    // An HTML error page from a proxy, say. The status still says what happened.
+  }
+  const reason = data.error?.errors?.[0]?.reason;
+  return new YouTubeApiError(explain(status, reason, data.error?.message ?? (text.slice(0, 300) || `HTTP ${status}`)), status, reason);
 }
 
 export type Credentials = {
@@ -77,6 +93,22 @@ export class YouTubeClient {
   private tokenCache = new Map<string, { token: string; expiresAt: number }>();
 
   constructor(private readonly creds: Credentials) {}
+
+  /**
+   * The bearer token for the connected channel, for the upload endpoints that
+   * do not go through `request`. `force` refreshes it even when the cached one
+   * looks fresh, which an upload needs after a 401 halfway through a long file.
+   */
+  async bearer(force = false): Promise<string> {
+    const account = this.creds.account;
+    if (!account) {
+      throw new Error(
+        "No account is configured for this action. Run `youtube-cli login` once per channel, or set YOUTUBE_ACCOUNTS.",
+      );
+    }
+    if (force) this.tokenCache.delete(account.id);
+    return this.accessToken(account);
+  }
 
   /** An access token for the account, refreshing when it is within a minute of expiry. */
   private async accessToken(account: Account): Promise<string> {
@@ -176,18 +208,8 @@ export class YouTubeClient {
     });
 
     const text = await res.text();
-    const data = text ? JSON.parse(text) : {};
-
-    if (!res.ok) {
-      const err = (data as { error?: { message?: string; errors?: { reason?: string }[] } }).error;
-      const reason = err?.errors?.[0]?.reason;
-      throw new YouTubeApiError(
-        explain(res.status, reason, err?.message ?? text),
-        res.status,
-        reason,
-      );
-    }
-    return data as T;
+    if (!res.ok) throw apiError(res.status, text);
+    return (text ? JSON.parse(text) : {}) as T;
   }
 
   get<T>(path: string, params: Record<string, unknown> = {}, requireAuth = false): Promise<T> {

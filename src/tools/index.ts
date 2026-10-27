@@ -10,5 +10,6 @@ import type { AnyToolSpec } from "./kit.js";
 import { transcriptTools } from "./transcripts.js";
 import { researchTools } from "./research.js";
 import { accountTools } from "./account.js";
+import { uploadTools } from "./upload.js";
 
-export const ALL_TOOLS: AnyToolSpec[] = [...transcriptTools, ...researchTools, ...accountTools];
+export const ALL_TOOLS: AnyToolSpec[] = [...transcriptTools, ...researchTools, ...accountTools, ...uploadTools];

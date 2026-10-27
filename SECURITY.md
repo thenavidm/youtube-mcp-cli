@@ -37,10 +37,13 @@ until you revoke it at
 ## The write-safety model
 
 Writes work by default, because managing a channel is the point of the tool.
-There are 14 read tools and 3 that write.
+There are 16 read tools and 4 that write.
 
 `reply_to_comment` and `delete_video` wait for your approval, because neither can
-be taken back. Over MCP a person approves each where the client can ask: Claude
+be taken back, and so does `upload_video` whenever viewers will see the video:
+public, unlisted, or scheduled with `publish_at`, since by default YouTube
+notifies subscribers of the new video. A private upload with no publish time
+does not wait: nobody sees it, and it is one click to delete. Over MCP a person approves each where the client can ask: Claude
 Code shows its own prompt, and a client that can show forms asks with one. Each
 approval is signed, bound to that exact call and works once. Where a client can
 do neither, the model must pass `confirm: true`, and `YOUTUBE_CONFIRM=model`
@@ -52,8 +55,14 @@ the same guard as the server, so the rules are identical on both surfaces.
 at call time. Use it when pointing an agent you do not fully trust at a real
 channel.
 
-`YOUTUBE_ALLOW_DESTRUCTIVE=0` keeps the reversible write and blocks the two
-irreversible ones outright.
+`YOUTUBE_ALLOW_DESTRUCTIVE=0` keeps the reversible writes, `update_video` and a
+private upload, and blocks replies, deletes and uploads viewers would see
+outright.
+
+`upload_video` reads the file you name, on the machine running the server, and
+streams it to Google. It reads nothing else from disk and keeps no copy. Over
+MCP that means a model can upload any video file this user account can read, so
+the path it passes is worth a glance in the approval prompt.
 
 `YOUTUBE_AUDIT_LOG=<path>` appends one JSON line per attempted write, allowed and
 blocked alike, with who approved it.

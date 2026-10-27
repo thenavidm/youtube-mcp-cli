@@ -17,8 +17,11 @@ import {
   toSlipwayError,
   toolkit,
   z,
+  type JobDefinition,
   type Risk,
   type Tool,
+  type ToolContext as RunContext,
+  type ToolExample,
 } from "@thenavidm/slipway";
 import type { Config } from "../config.js";
 import { resolveAccount } from "../config.js";
@@ -41,10 +44,18 @@ export type ToolSpec<S extends Shape> = {
   description: string;
   schema: S;
   risk: Risk;
+  /** The risk of one call, when its arguments decide it: a private upload is a write, a public one is not. */
+  riskFor?: (args: z.infer<z.ZodObject<S>>) => Risk;
+  /** What a confirmed call does, in YouTube's words, for the refusal and the approval form. */
+  consequence?: string;
   idempotent?: boolean;
+  /** Work that outlasts one call, such as an upload: Slipway adds `<name>_status`. */
+  job?: JobDefinition<ToolContext>;
+  examples?: ToolExample[];
   /** One line describing what the call is about to do, for the confirm message and the audit log. */
   summary?: (args: z.infer<z.ZodObject<S>>) => string;
-  handler: (args: z.infer<z.ZodObject<S>>, ctx: ToolContext) => Promise<string>;
+  /** `ctx` also carries Slipway's run context: `signal` to stop, `progress` to report. */
+  handler: (args: z.infer<z.ZodObject<S>>, ctx: RunContext<ToolContext>) => Promise<unknown>;
 };
 
 export type AnyToolSpec = Tool<ToolContext>;
@@ -86,13 +97,17 @@ export function toSlipway(error: unknown): unknown {
 
 export function defineTool<S extends Shape>(spec: ToolSpec<S>): Tool<ToolContext> {
   const { confirm: _confirm, ...shape } = spec.schema as Shape;
-  const handler = spec.handler as (args: Record<string, unknown>, ctx: ToolContext) => Promise<string>;
+  const handler = spec.handler as (args: Record<string, unknown>, ctx: RunContext<ToolContext>) => Promise<unknown>;
   return kit.defineTool({
     name: spec.name,
     title: spec.title,
     description: spec.description,
     input: z.object(shape),
     risk: spec.risk,
+    ...(spec.riskFor ? { riskFor: spec.riskFor as (args: Record<string, unknown>) => Risk } : {}),
+    ...(spec.consequence ? { consequence: spec.consequence } : {}),
+    ...(spec.job ? { job: spec.job } : {}),
+    ...(spec.examples ? { examples: spec.examples } : {}),
     ...(spec.idempotent !== undefined ? { idempotent: spec.idempotent } : {}),
     ...(spec.summary ? { summary: spec.summary as (args: Record<string, unknown>) => string } : {}),
     handler: async (args, ctx) => {

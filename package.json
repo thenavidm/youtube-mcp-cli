@@ -1,7 +1,7 @@
 {
   "name": "@thenavidm/youtube-mcp-cli",
-  "version": "3.0.2",
-  "description": "YouTube MCP server and CLI for Claude Code, Codex and AI agents. 17 tools for transcripts, most replayed moments, search, channel research, comments, analytics and multi-channel management.",
+  "version": "3.1.0",
+  "description": "YouTube MCP server and CLI for Claude Code, Codex and AI agents. 20 tools for transcripts, most replayed moments, search, channel research, comments, analytics, uploads with scheduling and multi-channel management.",
   "type": "module",
   "main": "./dist/index.js",
   "bin": {
@@ -58,6 +58,8 @@
     "mcp-cli",
     "transcripts",
     "youtube-data-api",
+    "youtube-upload",
+    "youtube-shorts",
     "slipway"
   ],
   "files": [

@@ -8,7 +8,7 @@
 [![X](https://img.shields.io/badge/X-@thenavidm-black?logo=x)](https://x.com/thenavidm)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-thenavidm-0A66C2?logo=linkedin&logoColor=white)](https://linkedin.com/in/thenavidm)
 
-YouTube MCP server and CLI for Claude Code and AI agents. 17 tools for transcripts, most replayed moments, search, channel research, comments, analytics and multi-channel management.
+YouTube MCP server and CLI for Claude Code and AI agents. 20 tools for transcripts, most replayed moments, search, channel research, comments, analytics, uploads with scheduling and multi-channel management.
 
 One install gives you both surfaces, the same tools under the same names.
 
@@ -17,6 +17,8 @@ results come back with view counts attached, which YouTube's own search endpoint
 does not return.
 
 Connect as many channels as you run, with one login each and no config file.
+Upload a video straight from your disk, a vertical Short included, and schedule
+it with YouTube's own publish time.
 
 Built and maintained by [Navid Moazzez](https://navid.me?utm_source=github&utm_medium=referral&utm_campaign=youtube-mcp-cli&utm_content=readme). Built on [Slipway](https://github.com/thenavidm/slipway), which turns one definition of each tool into the MCP server and the CLI.
 
@@ -48,11 +50,14 @@ youtube-cli search-videos "local-first software"             # with view counts
 youtube-cli list-comments --video-id dQw4w9WgXcQ --limit 20
 youtube-cli login                                            # connect a channel, once each
 youtube-cli list-my-videos --account thenavidm --limit 10
+youtube-cli upload-video ~/Movies/short.mp4 --title "One habit #shorts" \
+  --no-made-for-kids --publish-at 2026-11-02T15:00:00Z --confirm   # scheduled
+youtube-cli get-video-status VIDEO_ID                        # processing, scheduled, live
 youtube-cli <command> --help                                 # what any command takes
 ```
 
-`--confirm` is the shell spelling of the confirmation that replying to a comment
-and deleting a video require. `--agent` gives compact JSON with no prompts, and
+`--confirm` is the shell spelling of the confirmation that replying to a comment,
+deleting a video and uploading one viewers will see require. `--agent` gives compact JSON with no prompts, and
 errors are JSON on stderr whichever output you pick.
 
 `youtube-cli schema <command>` prints the exact JSON Schema an MCP client
@@ -70,8 +75,8 @@ claude mcp add youtube -- npx -y @thenavidm/youtube-mcp-cli@latest
 
 Then just ask: _"which of this channel's last 30 videos actually overperformed?"_
 
-Replying to a comment and deleting a video wait for your approval in the client,
-as [section 9](#9-writing-safely-) explains.
+Replying to a comment, deleting a video and uploading one viewers will see wait
+for your approval in the client, as [section 9](#9-writing-safely-) explains.
 
 Channels you connected with `youtube-cli login` on this machine are read
 automatically, so the command needs no credentials. Every other client is in
@@ -100,10 +105,11 @@ is the tool name with dashes.
 | Your channels and their numbers | `youtube-cli list-accounts` / `get-my-channel` / `get-channel-analytics` / `list-my-videos` | `list_accounts` / `get_my_channel` / `get_channel_analytics` / `list_my_videos` |
 | Comments | `youtube-cli list-comments` / `reply-to-comment` | `list_comments` / `reply_to_comment` |
 | Edit or delete your videos | `youtube-cli update-video` / `delete-video` | `update_video` / `delete_video` |
+| Upload from your disk, schedule, follow it | `youtube-cli upload-video` / `upload-video-status` / `get-video-status` | `upload_video` / `upload_video_status` / `get_video_status` |
 | Connect a channel or an API key | `youtube-cli login` / `logout` | not tools |
 | Check your setup | `youtube-cli doctor` | not a tool |
 
-All 16 are in [section 7](#7-tools-%EF%B8%8F).
+All 20 are in [section 7](#7-tools-%EF%B8%8F).
 
 ## Contents
 
@@ -115,7 +121,7 @@ All 16 are in [section 7](#7-tools-%EF%B8%8F).
 | 4 | [Connect your client](#4-connect-your-client-) | Claude, Cursor, Windsurf, the rest |
 | 5 | [Check it worked](#5-check-it-worked-) | And the two things that fail |
 | 6 | [Which surface, and what each costs](#6-which-surface-and-what-each-costs-) | Measured in Claude Code, and how to spend less |
-| 7 | [Tools](#7-tools-%EF%B8%8F) | All 16, grouped by what they need |
+| 7 | [Tools](#7-tools-%EF%B8%8F) | All 20, grouped by what they need |
 | 8 | [Output and exit codes](#8-output-and-exit-codes-) | What scripts branch on |
 | 9 | [Writing safely](#9-writing-safely-) | What is guarded and what is not |
 | 10 | [Several channels](#10-several-channels-) | Login once each, pick by name |
@@ -136,6 +142,8 @@ All 16 are in [section 7](#7-tools-%EF%B8%8F).
 - What did my last video do on watch time versus the one before?
 - Fix the typo in the title of that video.
 - Which of my videos are still unlisted?
+- Upload ~/Movies/short.mp4 as a Short and schedule it for Monday at 3pm.
+- Has the video I just uploaded finished processing?
 
 The one thing that is impossible without this: reading what was said in somebody
 else's video. YouTube's Captions API only serves videos you own, so every
@@ -145,7 +153,7 @@ credentials at all.
 
 ## 2. Quick install ⚡
 
-Node 20 or newer, and `yt-dlp` for transcripts.
+Node 22 or newer, and `yt-dlp` for transcripts.
 
 ```bash
 npx -y @thenavidm/youtube-mcp-cli@latest --version
@@ -177,7 +185,7 @@ pipx install yt-dlp        # everywhere else
 
 | You need | Check with | If missing |
 |---|---|---|
-| Node 20 or newer | `node -v` | [nodejs.org](https://nodejs.org) |
+| Node 22 or newer | `node -v` | [nodejs.org](https://nodejs.org) |
 | yt-dlp, for transcripts | `yt-dlp --version` | `brew install yt-dlp` or `pipx install yt-dlp` |
 | A Google Cloud project, for search and your channels | [console.cloud.google.com](https://console.cloud.google.com) | Free, no card, see section 3 |
 
@@ -228,7 +236,8 @@ youtube-cli login
 ```
 
 A browser opens, you pick the channel, and it is saved. **Run `youtube-cli
-login` once per channel.** Then `youtube-cli list-accounts` shows them all.
+login` once per channel.** Login asks for the upload permission too, so
+`upload-video` needs nothing more. Then `youtube-cli list-accounts` shows them all.
 [Section 10](#10-several-channels-) covers using several.
 
 You do not need Google to verify the app, but do click **Publish app** under
@@ -423,8 +432,9 @@ not: check the client before reconnecting anything.
 
 ## 6. Which surface, and what each costs 💰
 
-Both surfaces are the same program with the same 17 tools. The
-difference is when the model pays for them. Measured in Claude Code:
+Both surfaces are the same program with the same 20 tools. The
+difference is when the model pays for them. Measured in Claude Code on 3.0,
+before the three upload tools; 3.1.0 has not been measured yet:
 
 | Cost | MCP server | CLI |
 |---|---|---|
@@ -441,7 +451,7 @@ YouTube comes up or not. With the skill added, Claude Code also lists its
 one-line description, about 160 tokens.
 
 To spend less, turn the server off when you are not using it, which in Claude
-Code is the `/mcp` panel. `YOUTUBE_READ_ONLY=1` takes the 3 write tools off the list, leaving 13.
+Code is the `/mcp` panel. `YOUTUBE_READ_ONLY=1` takes the 4 write tools off the list, leaving 16.
 Or install the CLI and add the server on the days it earns its place.
 
 Measured on 2026-10-05 with Claude Code 2.1.286 on Claude Opus 5.5: one
@@ -508,7 +518,23 @@ just an API key.
 | `reply-to-comment` ! | `reply_to_comment` | A public reply |
 | `delete-video` ! | `delete_video` | Permanent |
 
-That is 14 read tools and 3 write tools.
+### Uploads
+
+Needs `youtube-cli login`. The file is read on the machine running the server.
+
+| Command | MCP tool | What it does |
+|---|---|---|
+| `upload-video` ! | `upload_video` | A local file with YouTube's resumable upload: title, description, tags, category, made for kids, privacy, an optional thumbnail, and a publish time to schedule it. Says whether the file will be a Short. Asks first only when viewers will see it |
+| `upload-video-status` | `upload_video_status` | Follows an upload that outlasted one call |
+| `get-video-status` | `get_video_status` | Uploaded, processing with percent and time left, scheduled, failed or rejected with YouTube's reason, or live |
+
+`upload_video` runs as a background job. Over MCP the call waits up to
+`wait_seconds` (25 by default, 55 at most) and hands back a `job_id` if the file
+is still going; `upload_video_status` follows it. In a terminal the command
+waits until the upload is done. Then `get_video_status` follows YouTube's own
+processing, which takes a while longer.
+
+That is 16 read tools and 4 write tools.
 
 ### Setup commands
 
@@ -572,12 +598,17 @@ esac
 
 Writes work by default, because managing a channel is the point.
 
-Two tools are guarded: `reply_to_comment`, because it is public the moment it
-lands and notifies someone, and `delete_video`, because YouTube removes a video
-immediately with no trash and no undo. Both wait for your approval. The CLI goes
-through the same guard as the server, so the rules are identical.
+Three tools are guarded: `reply_to_comment`, because it is public the moment it
+lands and notifies someone; `delete_video`, because YouTube removes a video
+immediately with no trash and no undo; and `upload_video` whenever viewers will
+see the video, public, unlisted, or scheduled with `publish_at`, because by
+default YouTube notifies your subscribers of a newly uploaded video, which
+cannot be called back. A private upload with no publish time is not guarded:
+nobody sees it, and it is one click to delete in YouTube Studio. Each guarded
+call waits for your approval. The CLI goes through the same guard as the server,
+so the rules are identical.
 
-Over MCP a person approves each of the two where the client can ask: Claude Code
+Over MCP a person approves each guarded call where the client can ask: Claude Code
 (2.1.246 and later) shows its own prompt, and a client that can show forms asks
 with an approval form whose one box starts unticked. Each approval is signed,
 bound to that exact call and works once. Where a client can do neither, the
@@ -593,7 +624,7 @@ reflexively, which is worse protection than not asking.
 | Setting | Effect |
 |---|---|
 | `YOUTUBE_READ_ONLY=1` | Every write disappears from the tool list and the command list |
-| `YOUTUBE_ALLOW_DESTRUCTIVE=0` | `update_video` stays, the two irreversible tools are blocked |
+| `YOUTUBE_ALLOW_DESTRUCTIVE=0` | `update_video` and private uploads stay; replies, deletes and uploads viewers would see are blocked |
 | `YOUTUBE_AUDIT_LOG=<path>` | One JSON line per attempted write, allowed and blocked alike, and who approved it |
 
 Comments, titles, descriptions and transcripts are written by other people. The
@@ -674,6 +705,27 @@ access completely.
 - **Video tags are only visible to the owner.** `get_video` shows them on your
   own videos and returns nothing for anyone else's. The API does this, not a
   permission you are missing.
+- **Uploads have their own daily allowance too.** `videos.insert` has its own
+  bucket: 100 calls a day, one per upload, apart from the 10,000-unit pool
+  ([quota costs](https://developers.google.com/youtube/v3/determine_quota_cost)).
+  A custom thumbnail costs about 50 units of the pool, and `get_video_status` 1.
+- **A Short is decided by the file.** YouTube makes a video a Short when it is
+  [up to 3 minutes with a square or vertical aspect ratio](https://support.google.com/youtube/answer/12779649).
+  `upload_video` reads the file's own header, turning a phone's rotated frames
+  upright, and says whether it qualifies. There is no Shorts switch in the API.
+- **Scheduling keeps the video private.** YouTube's `status.publishAt` "can be
+  set only if the privacy status of the video is private" and "the video has
+  never been published", and a time in the past publishes it right away
+  ([videos resource](https://developers.google.com/youtube/v3/docs/videos)).
+  `upload_video` sets private for you when you pass `publish_at`.
+- **Uploads default to private here.** YouTube's own default for an API upload
+  is public. Made for kids is never assumed: it is the channel owner's legal
+  answer, so `made_for_kids` is required.
+- **A long upload survives a dropped connection.** The
+  [resumable protocol](https://developers.google.com/youtube/v3/guides/using_resumable_upload_protocol)
+  asks YouTube how much it has after a 500, 502, 503, 504 or a lost connection,
+  and carries on from there with exponential backoff. An expired session (404)
+  means starting again.
 - **Shorts skew channel analysis.** Their view counts are not comparable to
   long-form on the same channel, so `analyze_channel` scores Shorts against the
   channel's Shorts and long videos against its long videos, never one pooled
@@ -686,7 +738,8 @@ access completely.
 There is no backend. Every request goes from your machine to Google directly,
 and nothing is collected or sent anywhere else.
 
-Two things are written to disk, both only when you ask:
+A video you upload is read from your disk and streamed to Google; no copy is
+kept. Two things are written to disk, both only when you ask:
 
 | What | Where | When |
 |---|---|---|
@@ -717,12 +770,17 @@ are in its output.
 | 403, API not enabled | YouTube Data API v3 is off in that Cloud project |
 | 403 on captions or comments | The token predates the `force-ssl` scope. Run `youtube-cli login` again |
 | `quotaExceeded` | The pool resets at midnight Pacific |
+| An upload stops at once with `quotaExceeded` | The 100 `videos.insert` calls for today are spent. It resets at midnight Pacific |
+| `uploadLimitExceeded` | YouTube's own limit on how many videos this channel may upload for now. Wait |
+| `upload_video` hands back a `job_id` | The file is still going. Follow it with `upload_video_status`, then `get_video_status` |
+| The result says `thumbnail: { set: false }` | YouTube would not take the thumbnail, often because this channel may not set custom thumbnails yet. The video is uploaded; add it in YouTube Studio |
+| `invalidPublishAt` | `publish_at` needs a timezone, and only a private video that has never been published can be scheduled |
 | Search stops working before anything else | Search has its own 100-call daily allowance |
 | HTTP 429 on a transcript | YouTube is rate limiting your IP. Waiting is the only fix |
 | A command refuses and lists your channels | Two or more are connected. Pass `--account` |
 | Every write command has vanished | `YOUTUBE_READ_ONLY=1` is set |
 | Server missing in Claude Desktop | Use the absolute path to `npx`, check the JSON, and fully quit the app |
-| "will not run without --confirm" | Working as intended: a reply is public and a delete is permanent. See [section 9](#9-writing-safely-) |
+| "will not run without --confirm" | Working as intended: a reply is public, a delete is permanent, and an upload viewers will see notifies subscribers. See [section 9](#9-writing-safely-) |
 | `claude -p` will not reply or delete | Headless Claude Code refuses tools that need a person. Give that agent `YOUTUBE_CONFIRM=model` |
 | No approval form appears | The client cannot show forms, so the model's `confirm: true` counts, and only for an action you asked for |
 | YouTube asks yt-dlp to prove it is not a bot | Set `YOUTUBE_YTDLP_COOKIES` to a cookies.txt exported from a browser signed in to YouTube |
@@ -752,7 +810,7 @@ you ran `youtube-cli login`.
 | Variable | Default | What it does |
 |---|---|---|
 | `YOUTUBE_READ_ONLY` | `0` | `1` hides every write |
-| `YOUTUBE_ALLOW_DESTRUCTIVE` | `1` | `0` blocks the two irreversible tools |
+| `YOUTUBE_ALLOW_DESTRUCTIVE` | `1` | `0` blocks replies, deletes, and uploads that viewers would see |
 | `YOUTUBE_AUDIT_LOG` | none | Append-only log of every attempted write, and who approved it |
 | `YOUTUBE_CONFIRM` | `human` | `model` lets `confirm: true` alone approve over MCP, for an agent with no person to ask |
 
@@ -884,6 +942,17 @@ Access tokens last an hour and are refreshed automatically, so you will not
 notice. A refresh token lasts until you revoke it, with one exception: an OAuth
 app still in testing issues refresh tokens that expire after seven days. Publish
 the app to stop that, or run `youtube-cli login` again when it happens.
+
+</details>
+
+<details>
+<summary><b>Can it post Shorts and schedule them?</b></summary>
+
+Yes. `upload_video` uploads a file from your disk and, with `publish_at`, keeps
+it private until YouTube publishes it at that time. YouTube treats a video up to
+3 minutes with a square or vertical aspect ratio as a Short, and the result says
+whether your file qualifies. Each upload uses one of the 100 uploads a day
+YouTube allows a Cloud project.
 
 </details>
 

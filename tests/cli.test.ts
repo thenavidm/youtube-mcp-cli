@@ -29,7 +29,8 @@ describe("YouTube on Slipway", () => {
     const mcp = await connect(app, { env });
     const names = (await mcp.listTools()).map((tool) => tool.name).sort();
     await mcp.close();
-    expect(names).toEqual(ALL_TOOLS.map((tool) => tool.name).sort());
+    // upload_video is a job, so Slipway adds upload_video_status beside it.
+    expect(names).toEqual([...ALL_TOOLS.map((tool) => tool.name), "upload_video_status"].sort());
   });
 
   it("refuses to delete a video without --confirm, before anything reaches YouTube", async () => {
@@ -39,19 +40,21 @@ describe("YouTube on Slipway", () => {
     expect(run.stderr).toContain("permanently delete video abc");
   });
 
-  it("asks for approval on the two irreversible tools and on no other", async () => {
+  it("asks for approval on the irreversible tools and on no other", async () => {
     const mcp = await connect(app, { env });
     const tools = await mcp.listTools();
     await mcp.close();
     const confirming = tools.filter((tool) => "confirm" in ((tool.inputSchema as { properties?: object }).properties ?? {})).map((tool) => tool.name);
-    expect(confirming.sort()).toEqual(["delete_video", "reply_to_comment"]);
+    // upload_video takes confirm, but asks for it only when viewers will see the video: see upload.test.ts.
+    expect(confirming.sort()).toEqual(["delete_video", "reply_to_comment", "upload_video"]);
   });
 
   it("hides every write when YOUTUBE_READ_ONLY is set", async () => {
     const mcp = await connect(app, { env: { ...env, YOUTUBE_READ_ONLY: "1" } });
     const tools = await mcp.listTools();
     await mcp.close();
-    expect(tools.length).toBe(ALL_TOOLS.filter((tool) => tool.risk === "read").length);
+    expect(tools.every((tool) => tool.annotations?.readOnlyHint === true)).toBe(true);
+    expect(tools.length).toBe(app.allTools.filter((tool) => tool.risk === "read").length);
   });
 
   it("keeps 2.0's auth and logout, and logout names what to pass", async () => {

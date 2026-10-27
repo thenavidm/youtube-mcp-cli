@@ -74,7 +74,7 @@ came for, stop here. It already works.
 comments on any public video. About ten minutes: sections 3 to 5.
 
 **An OAuth client** gets you your own channels: private and unlisted videos,
-Analytics, comment replies and video edits. About half an hour, most of it
+Analytics, comment replies, video edits and uploads from your disk. About half an hour, most of it
 forms: sections 3, 4, 6, 7 and 8.
 
 ## 3. Make a Google Cloud project
@@ -194,6 +194,11 @@ youtube-cli list-my-videos --account thenavidm
 The name is the channel's handle without the `@`, or its title when it has no
 handle. With two or more connected, every account command needs `--account`
 and refuses to guess, because acting on the wrong channel is not recoverable.
+
+Login asks for every permission the tools use, uploading included, so
+`upload-video` works on a connected channel with nothing more to set up. A
+channel connected before uploads existed already granted it: login has asked
+for `youtube.upload` since the first version.
 
 A few variations:
 

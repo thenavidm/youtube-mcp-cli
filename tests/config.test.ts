@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { loadConfig, resolveAccount, type Config } from "../src/config.js";
 
 const KEYS = [
@@ -13,9 +13,12 @@ const KEYS = [
   "YOUTUBE_READ_ONLY",
 ];
 
-afterEach(() => {
+// Before as well as after: a shell that exports a real client id must not leak into the first test.
+const clear = () => {
   for (const k of KEYS) delete process.env[k];
-});
+};
+beforeEach(clear);
+afterEach(clear);
 
 const base = (accounts: Config["accounts"]): Config => ({
   accounts,

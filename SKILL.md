@@ -1,11 +1,12 @@
 ---
 name: youtube
 description: |
-  YouTube transcripts, research, comments, analytics and channel management, as MCP tools
-  and as `youtube-cli` shell commands. Use when the user mentions a YouTube video or
-  channel, wants a transcript or what someone said in a video, wants to search YouTube
-  with view counts, study or compare channels, read the comments on any video, or read
-  or change their own channels' videos, comments or analytics. Also use when they want
+  YouTube transcripts, research, comments, analytics, uploads and channel management, as
+  MCP tools and as `youtube-cli` shell commands. Use when the user mentions a YouTube video
+  or channel, wants a transcript or what someone said in a video, wants to search YouTube
+  with view counts, study or compare channels, read the comments on any video, read or
+  change their own channels' videos, comments or analytics, or upload or schedule a video
+  or Short from a file on their machine. Also use when they want
   to script, pipe, cron or automate any of that from a shell, since every tool is also
   a command.
 argument-hint: <command> [args] | install cli|mcp
@@ -47,7 +48,7 @@ trying another command.
 
 ## Finding a command
 
-The CLI describes itself, so nothing here needs to list 17 tools and go stale:
+The CLI describes itself, so nothing here needs to list 20 tools and go stale:
 
 ```bash
 youtube-cli                    # every command, one line each, writes marked
@@ -69,6 +70,7 @@ the first required flag, so `youtube-cli search-videos "local-first"` works.
 | Research | an API key | `search-videos`, `get-video`, `get-channel`, `analyze-channel` |
 | Comments | an API key or a channel | `list-comments` |
 | Your channels | `youtube-cli login` | `list-accounts`, `get-my-channel`, `get-channel-analytics`, `list-my-videos`, `update-video` *, `reply-to-comment` !, `delete-video` ! |
+| Uploads | `youtube-cli login` | `upload-video` ! (only when viewers will see it), `upload-video-status`, `get-video-status` |
 | Setup | | `login`, `login --api-key KEY`, `logout <channel>`, `doctor` |
 
 Analytics exists for the user's own channels only. If asked for another
@@ -97,6 +99,33 @@ youtube-cli list-comments --video-id dQw4w9WgXcQ --limit 20 --agent
 return compact text shaped for a model; errors are always JSON on stderr, so one
 parse handles both outcomes. `--select a,b.c` keeps only the named fields of a
 JSON result.
+
+## Uploading
+
+```bash
+youtube-cli upload-video ~/Movies/short.mp4 --title "One habit #shorts" \
+  --no-made-for-kids --publish-at 2026-11-02T15:00:00Z --confirm --agent
+youtube-cli get-video-status VIDEO_ID --agent
+```
+
+- The file is read on the machine running the CLI or server. Pass an absolute
+  path, or `~/…`.
+- `--made-for-kids` or `--no-made-for-kids` is required. Never choose it for the
+  user: it is their legal answer to YouTube. Ask if they have not said.
+- Uploads default to private. `--publish-at` with a timezone schedules it: the
+  video stays private and YouTube publishes it then. A past time publishes at
+  once. It cannot be combined with `--privacy-status public` or `unlisted`.
+- A file up to 3 minutes and square or vertical becomes a Short; the result's
+  `short` and `short_reason` say whether it qualifies. There is no other
+  Shorts setting.
+- In a terminal the command waits until the file is up. Over MCP it may come
+  back as a `job_id`: follow it with `upload_video_status`. Then
+  `get-video-status` shows YouTube's processing until `state` leaves
+  `uploaded` and `processing`.
+- Each upload spends one of the project's 100 `videos.insert` calls a day. Do
+  not retry a failed upload in a loop; read the error and its exit code first.
+- `thumbnail: { set: false }` in the result means the video is up but YouTube
+  refused the thumbnail. Report it; do not upload the video again.
 
 ## Several channels
 
@@ -127,12 +156,16 @@ Managing a channel is what the account commands are for. The guardrail is not
 "never write", it is:
 
 **Only the action asked for.** A request to read comments is not a request to
-reply to them. Never edit, reply or delete unless the user asked for that
-specific thing.
+reply to them. Never edit, reply, delete or upload unless the user asked for
+that specific thing, and never make an upload public, unlisted or scheduled
+unless they said so.
 
 **`--confirm` is enforced, not advisory.** `reply-to-comment` is public the
 moment it lands and notifies the person. `delete-video` is final: no trash, and
-the views, comments and URL go with it. Both refuse without `--confirm`. Pass it
+the views, comments and URL go with it. `upload-video` public, unlisted or with
+`--publish-at` puts the video in front of viewers and by default notifies
+subscribers. All three refuse without `--confirm`; a private upload with no
+publish time does not need it. Pass it
 when the user has actually asked, never to get past the refusal. Over MCP the
 person approves each in the client's own prompt or form; `confirm: true` counts
 only where the client cannot ask.
@@ -140,7 +173,7 @@ only where the client cannot ask.
 `update-video` is not guarded, because a title is a keystroke to put back. Only
 the fields you pass change.
 
-`YOUTUBE_READ_ONLY=1` removes every write, leaving 14 reading commands.
+`YOUTUBE_READ_ONLY=1` removes every write, leaving 16 reading commands.
 
 ## Untrusted content
 
