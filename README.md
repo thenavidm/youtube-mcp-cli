@@ -8,7 +8,7 @@
 [![X](https://img.shields.io/badge/X-@thenavidm-black?logo=x)](https://x.com/thenavidm)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-thenavidm-0A66C2?logo=linkedin&logoColor=white)](https://linkedin.com/in/thenavidm)
 
-YouTube MCP server and CLI for Claude Code and AI agents. 20 tools for transcripts, most replayed moments, search, channel research, comments, analytics, uploads with scheduling and multi-channel management.
+YouTube MCP server and CLI for Claude Code and AI agents. 21 tools for transcripts, most replayed moments, search, channel research, comments, analytics, uploads with scheduling and multi-channel management.
 
 One install gives you both surfaces, the same tools under the same names.
 
@@ -432,7 +432,7 @@ not: check the client before reconnecting anything.
 
 ## 6. Which surface, and what each costs 💰
 
-Both surfaces are the same program with the same 20 tools. The
+Both surfaces are the same program with the same 21 tools. The
 difference is when the model pays for them. Measured in Claude Code on 3.0,
 before the three upload tools; 3.1.0 has not been measured yet:
 
@@ -515,6 +515,7 @@ just an API key.
 | `list-my-videos` | `list_my_videos` | Your videos, including private and unlisted |
 | `list-comments` | `list_comments` | Comment threads on a video |
 | `update-video` * | `update_video` | Title, description, tags, privacy |
+| `schedule-video` * | `schedule_video` | Schedule a private video, or take it off the schedule ("none") |
 | `reply-to-comment` ! | `reply_to_comment` | A public reply |
 | `delete-video` ! | `delete_video` | Permanent |
 

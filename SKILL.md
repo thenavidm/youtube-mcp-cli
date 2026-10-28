@@ -48,7 +48,7 @@ trying another command.
 
 ## Finding a command
 
-The CLI describes itself, so nothing here needs to list 20 tools and go stale:
+The CLI describes itself, so nothing here needs to list 21 tools and go stale:
 
 ```bash
 youtube-cli                    # every command, one line each, writes marked

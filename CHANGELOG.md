@@ -9,6 +9,10 @@
 | yt-dlp, for transcripts | any current release |
 | Node | >= 22 |
 
+## Unreleased
+
+- `schedule_video` (`youtube-cli schedule-video`): set when a private video publishes, or take it off the schedule with `--publish-at none` and keep it private. Scheduling asks for approval, as an upload that viewers will see does; unscheduling does not. The video's other status settings are read back and kept, because the API replaces the whole status.
+
 ## 3.1.0, 2026-10-27
 
 Uploads. 20 tools, 16 of them read.

@@ -9,7 +9,7 @@
 
 import { z } from "zod";
 import { clamp, defineTool, type AnyToolSpec } from "./kit.js";
-import { AuthError, NotFoundError } from "@thenavidm/slipway";
+import { AuthError, NotFoundError, UsageError } from "@thenavidm/slipway";
 
 const account = z
   .string()
@@ -241,6 +241,50 @@ export const accountTools: AnyToolSpec[] = [
         ...(args.privacy_status ? { status: { privacyStatus: args.privacy_status } } : {}),
       });
       return `Updated ${args.video_id}.`;
+    },
+  }),
+
+  defineTool({
+    name: "schedule_video",
+    title: "Schedule or unschedule a video",
+    description:
+      'Set when a private video publishes, or take it off the schedule. publish_at is an ISO 8601 time with its zone: YouTube keeps the video private and publishes it then, which is public, so it needs confirm: true. publish_at "none" unschedules it and keeps it private, which needs no confirmation. The video\'s other status settings (licence, embedding, made-for-kids, synthetic media) are read back and kept, because the API replaces the whole status.',
+    schema: {
+      video_id: z.string(),
+      publish_at: z.string().describe('An ISO 8601 time with its zone, such as 2026-11-03T14:00:00Z, or "none" to unschedule.'),
+      confirm: z.boolean().optional(),
+      account,
+    },
+    risk: "destructive",
+    riskFor: (args: { publish_at?: string }) => (args.publish_at === "none" ? "write" : "destructive"),
+    consequence: "makes the video public at that time",
+    summary: (args) => (args.publish_at === "none" ? `unschedule ${args.video_id}` : `schedule ${args.video_id} for ${args.publish_at}`),
+    handler: async (args, ctx) => {
+      const none = args.publish_at === "none";
+      if (!none && (!/(Z|[+-]\d{2}:?\d{2})$/i.test(args.publish_at.trim()) || Number.isNaN(Date.parse(args.publish_at)))) {
+        throw new UsageError(`publish_at "${args.publish_at}" is not an ISO 8601 time with a timezone, such as 2026-11-03T14:00:00Z, or "none".`);
+      }
+      const client = ctx.clientFor(args.account);
+      const current = await client.get<{
+        items?: { status?: { privacyStatus?: string; publishAt?: string; license?: string; embeddable?: boolean; publicStatsViewable?: boolean; selfDeclaredMadeForKids?: boolean; madeForKids?: boolean; containsSyntheticMedia?: boolean } }[];
+      }>("/videos", { part: "status", id: args.video_id }, true);
+      const s = current.items?.[0]?.status;
+      if (!s) throw new NotFoundError(`No video ${args.video_id} on this channel.`);
+      if (s.privacyStatus !== "private" && !s.publishAt) throw new UsageError(`${args.video_id} is already ${s.privacyStatus}: only a private video can be scheduled or unscheduled.`);
+      await client.put("/videos", { part: "status" }, {
+        id: args.video_id,
+        status: {
+          privacyStatus: "private",
+          // Left out, publishAt is cleared: the video stays private with no date.
+          ...(none ? {} : { publishAt: new Date(args.publish_at).toISOString() }),
+          license: s.license,
+          embeddable: s.embeddable,
+          publicStatsViewable: s.publicStatsViewable,
+          selfDeclaredMadeForKids: s.selfDeclaredMadeForKids ?? s.madeForKids ?? false,
+          ...(s.containsSyntheticMedia !== undefined ? { containsSyntheticMedia: s.containsSyntheticMedia } : {}),
+        },
+      });
+      return none ? `Took ${args.video_id} off the schedule; it stays private.` : `Scheduled ${args.video_id} for ${new Date(args.publish_at).toISOString()}.`;
     },
   }),
 

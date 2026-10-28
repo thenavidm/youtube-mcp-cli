@@ -45,8 +45,8 @@ describe("YouTube on Slipway", () => {
     const tools = await mcp.listTools();
     await mcp.close();
     const confirming = tools.filter((tool) => "confirm" in ((tool.inputSchema as { properties?: object }).properties ?? {})).map((tool) => tool.name);
-    // upload_video takes confirm, but asks for it only when viewers will see the video: see upload.test.ts.
-    expect(confirming.sort()).toEqual(["delete_video", "reply_to_comment", "upload_video"]);
+    // upload_video and schedule_video take confirm, but ask for it only when viewers will see the video.
+    expect(confirming.sort()).toEqual(["delete_video", "reply_to_comment", "schedule_video", "upload_video"]);
   });
 
   it("hides every write when YOUTUBE_READ_ONLY is set", async () => {
