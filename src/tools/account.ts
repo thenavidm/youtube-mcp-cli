@@ -271,7 +271,7 @@ export const accountTools: AnyToolSpec[] = [
       const s = current.items?.[0]?.status;
       if (!s) throw new NotFoundError(`No video ${args.video_id} on this channel.`);
       if (s.privacyStatus !== "private" && !s.publishAt) throw new UsageError(`${args.video_id} is already ${s.privacyStatus}: only a private video can be scheduled or unscheduled.`);
-      await client.put("/videos", { part: "status" }, {
+      const saved = await client.put<{ status?: { privacyStatus?: string; publishAt?: string } }>("/videos", { part: "status" }, {
         id: args.video_id,
         status: {
           privacyStatus: "private",
@@ -284,7 +284,8 @@ export const accountTools: AnyToolSpec[] = [
           ...(s.containsSyntheticMedia !== undefined ? { containsSyntheticMedia: s.containsSyntheticMedia } : {}),
         },
       });
-      return none ? `Took ${args.video_id} off the schedule; it stays private.` : `Scheduled ${args.video_id} for ${new Date(args.publish_at).toISOString()}.`;
+      // YouTube's own answer, so the caller sees what it holds now.
+      return { video_id: args.video_id, privacy_status: saved?.status?.privacyStatus ?? "private", publish_at: saved?.status?.publishAt ?? null };
     },
   }),
 
