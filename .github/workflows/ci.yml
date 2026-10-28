@@ -57,11 +57,18 @@ jobs:
                 const tools = listed?.result?.tools ?? [];
                 console.log(`tools: ${tools.length}`);
                 // Compared against the source, not a number typed here: a
-                  // literal turns every tool added into a red build.
-                  const { ALL_TOOLS } = await import("./dist/tools/index.js");
-                  const expected = ALL_TOOLS.length;
-                  if (tools.length !== expected) {
-                  console.error(`handshake exposed ${tools.length} tools, ALL_TOOLS has ${expected}`);
+                // literal turns every tool added into a red build. Slipway
+                // serves a generated <name>_status beside every background-job
+                // tool, so those belong in the expected list too.
+                const { ALL_TOOLS } = await import("./dist/tools/index.js");
+                const expected = ALL_TOOLS.flatMap(t => t.job ? [t.name, `${t.name}_status`] : [t.name]);
+                const names = tools.map(t => t.name);
+                const missing = expected.filter(n => !names.includes(n));
+                const extra = names.filter(n => !expected.includes(n));
+                if (missing.length || extra.length) {
+                  console.error(`handshake exposed ${tools.length} tools, ALL_TOOLS (with job status tools) has ${expected.length}`);
+                  if (missing.length) console.error("missing: " + missing.join(", "));
+                  if (extra.length) console.error("not in ALL_TOOLS: " + extra.join(", "));
                   process.exit(1);
                 }
                 const unannotated = tools.filter(t => t.annotations?.readOnlyHint === undefined);
